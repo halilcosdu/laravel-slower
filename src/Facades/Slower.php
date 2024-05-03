@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @see \HalilCosdu\Slower\Slower
+ *
  * @method static \HalilCosdu\Slower\Slower analyze(Model $record): Model
  */
 class Slower extends Facade
