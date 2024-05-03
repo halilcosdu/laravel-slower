@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 
 class AnalyzeQuery extends Command
 {
-    public $signature = 'slower-analyze';
+    public $signature = 'slower:analyze';
 
     public $description = 'Analyze and generate a recommendation for the given record.';
 

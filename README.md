@@ -50,8 +50,8 @@ This is the contents of the published config file:
 ## Usage
 You can register the commands with your scheduler.
 ```php
-php artisan slower-clean /*{days=15}  Delete records older than 15 days.*/
-php artisan slower-analyze /*Analyze the records where is_analyzed=false*/
+php artisan slower:clean /*{days=15}  Delete records older than 15 days.*/
+php artisan slower:analyze /*Analyze the records where is_analyzed=false*/
 ```
 
 ```php

@@ -6,7 +6,7 @@ use Illuminate\Console\Command;
 
 class SlowLogCleaner extends Command
 {
-    public $signature = 'slower-clean {days=15}';
+    public $signature = 'slower:clean {days=15}';
 
     public $description = 'Delete records older than 15 days.';
 
