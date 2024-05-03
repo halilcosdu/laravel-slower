@@ -53,6 +53,22 @@ You can register the commands with your scheduler.
 php artisan slower-clean /*{days=15}  Delete records older than 15 days.*/
 php artisan slower-analyze /*Analyze the records where is_analyzed=false*/
 ```
+
+```php
+    protected $commands = [
+        AnalyzeQuery::class,
+        SlowLogCleaner::class,
+    ];
+
+    /**
+     * Define the application's command schedule.
+     */
+    protected function schedule(Schedule $schedule): void
+    {
+        $schedule->command(AnalyzeQuery::class)->runInBackground()->daily();
+        $schedule->command(SlowLogCleaner::class)->runInBackground()->daily();
+    }
+```
 ```php
 $model = \HalilCosdu\Slower\Models\SlowLog::first();
 
