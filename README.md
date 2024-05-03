@@ -22,6 +22,29 @@ php artisan vendor:publish --tag="slower-migrations"
 php artisan migrate
 ```
 
+```php
+public function up()
+{
+    Schema::create(config('slower.resources.table_name'), function (Blueprint $table) {
+        $table->id();
+        $table->boolean('is_analyzed')->default(false)->index();
+        $table->string('bindings');
+        $table->longtext('sql');
+        $table->unsignedInteger('time')->index();
+        $table->string('connection');
+        $table->string('connection_name');
+        $table->longtext('raw_sql');
+        $table->longtext('recommendation')->nullable();
+
+        $table->timestamps();
+    });
+}
+
+public function down(): void
+{
+    Schema::dropIfExists(config('slower.resources.table_name'));
+}
+```
 You can publish the config file with:
 
 ```bash
