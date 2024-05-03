@@ -1,4 +1,4 @@
-# Laravel Slower: Optimize Your Laravel Queries with AI
+# Laravel Slower: Optimize Your DB Queries with AI
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/halilcosdu/laravel-slower.svg?style=flat-square)](https://packagist.org/packages/halilcosdu/laravel-slower)
 [![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/halilcosdu/laravel-slower/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/halilcosdu/laravel-slower/actions?query=workflow%3Arun-tests+branch%3Amain)
@@ -37,7 +37,7 @@ This is the contents of the published config file:
         'table_name' => (new SlowLog)->getTable(),
         'model' => SlowLog::class,
     ],
-    'ai_recommendation' => env('SLOWER_AI_RECOMMENDATION', true),
+    'ai_recommendation' => env('SLOWER_AI_RECOMMENDATION', true), // You can completely disable AI, and then the package will only log slow queries to the database.
     'open_ai' => [
         'api_key' => env('OPENAI_API_KEY'),
         'organization' => env('OPENAI_ORGANIZATION'),
