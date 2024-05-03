@@ -8,7 +8,7 @@ return [
     'enabled' => env('SLOWER_ENABLED', true),
     'threshold' => env('SLOWER_THRESHOLD', 10000),
     'resources' => [
-        'table_name' => SlowLog::getTable(),
+        'table_name' => (new SlowLog)->getTable(),
         'model' => SlowLog::class,
     ],
     'ai_recommendation' => env('SLOWER_AI_RECOMMENDATION', true),
