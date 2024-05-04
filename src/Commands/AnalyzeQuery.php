@@ -14,6 +14,11 @@ class AnalyzeQuery extends Command
 
     public function handle(RecommendationService $recommendationService): int
     {
+        if (! config('slower.enabled') || ! config('slower.ai_recommendation')) {
+            $this->warn('Slower or AI recommendation is not enabled. Please enable it in the configuration file.');
+
+            return self::SUCCESS;
+        }
         $model = config('slower.resources.model');
 
         (new $model)::query()
