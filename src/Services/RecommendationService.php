@@ -18,18 +18,19 @@ class RecommendationService
             'model' => 'gpt-4',
             'messages' => [
                 ['role' => 'system', 'content' => config('slower.prompt')],
-                ['role' => 'user', 'content' => 'The number of milliseconds it took to execute the query:'.$record->time.PHP_EOL.
-                    'Connection: '.$record->connection.PHP_EOL.
-                    'Connection Name: '.$record->connection.PHP_EOL.
-                    'Sql: '.$record->raw_sql,
+                ['role' => 'user', 'content' => 'The query execution took '.$record->time.' milliseconds.'.PHP_EOL.
+                                    'Connection: '.$record->connection.PHP_EOL.
+                                    'Connection Name: '.$record->connection.PHP_EOL.
+                                    'Sql: '.$record->raw_sql,
                 ],
             ],
         ]);
 
-        $record->update([
-            'is_analyzed' => true,
-            'recommendation' => $result->choices[0]->message->content,
-        ]
+        $record->update(
+            [
+                'is_analyzed' => true,
+                'recommendation' => $result->choices[0]->message->content,
+            ]
         );
 
         return $result->choices[0]->message->content;
