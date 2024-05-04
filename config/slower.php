@@ -12,6 +12,7 @@ return [
         'model' => SlowLog::class,
     ],
     'ai_recommendation' => env('SLOWER_AI_RECOMMENDATION', true),
+    'recommendation_model' => env('SLOWER_AI_RECOMMENDATION_MODEL', 'gpt-4'),
     'open_ai' => [
         'api_key' => env('OPENAI_API_KEY'),
         'organization' => env('OPENAI_ORGANIZATION'),

@@ -15,7 +15,7 @@ class RecommendationService
     {
 
         $result = $this->client->chat()->create([
-            'model' => 'gpt-4',
+            'model' => config('slower.recommendation_model', 'gpt-4'),
             'messages' => [
                 ['role' => 'system', 'content' => config('slower.prompt')],
                 ['role' => 'user', 'content' => 'The query execution took '.$record->time.' milliseconds.'.PHP_EOL.

@@ -61,6 +61,7 @@ This is the contents of the published config file:
         'model' => SlowLog::class,
     ],
     'ai_recommendation' => env('SLOWER_AI_RECOMMENDATION', true), // You can completely disable AI, and then the package will only log slow queries to the database.
+    'recommendation_model' => env('SLOWER_AI_RECOMMENDATION_MODEL', 'gpt-4'),
     'open_ai' => [
         'api_key' => env('OPENAI_API_KEY'),
         'organization' => env('OPENAI_ORGANIZATION'),
