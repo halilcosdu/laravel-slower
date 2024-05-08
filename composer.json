@@ -2,9 +2,17 @@
     "name": "halilcosdu/laravel-slower",
     "description": "Laravel Slower: Optimize Your DB Queries with AI",
     "keywords": [
-        "HalilCosdu",
+        "Halil Cosdu",
         "laravel",
-        "laravel-slower"
+        "laravel-slower",
+        "database-optimization",
+        "AI",
+        "query-optimization",
+        "performance",
+        "SQL",
+        "DB-queries",
+        "openai",
+        "machine-learning"
     ],
     "homepage": "https://github.com/halilcosdu/laravel-slower",
     "license": "MIT",
