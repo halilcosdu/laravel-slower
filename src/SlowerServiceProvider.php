@@ -8,6 +8,7 @@ use HalilCosdu\Slower\Services\RecommendationService;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use OpenAI as OpenAIFactory;
 use Spatie\LaravelPackageTools\Package;
@@ -69,6 +70,10 @@ class SlowerServiceProvider extends PackageServiceProvider
     private function createRecord(QueryExecuted $event, Connection $connection): void
     {
         $model = config('slower.resources.model');
+
+        if (Str::contains($event->sql, [(new $model)->getTable()])) {
+            return;
+        }
 
         (new $model)::query()->create([
             'bindings' => $event->bindings,
