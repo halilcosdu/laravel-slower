@@ -27,7 +27,6 @@ class SlowerServiceProvider extends PackageServiceProvider
             ->name('laravel-slower')
             ->hasConfigFile()
             ->hasMigration('create_slower_table')
-            ->publishesServiceProvider(SlowerServiceProvider::class)
             ->hasCommands(SlowLogCleaner::class, AnalyzeQuery::class);
     }
 
