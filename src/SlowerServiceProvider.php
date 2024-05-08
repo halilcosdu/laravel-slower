@@ -74,7 +74,7 @@ class SlowerServiceProvider extends PackageServiceProvider
             'bindings' => $event->bindings,
             'sql' => $event->sql,
             'time' => $event->time,
-            'connection' => $event->connection,
+            'connection' => get_class($event->connection),
             'connection_name' => $event->connectionName,
             'raw_sql' => $connection->getQueryGrammar()->substituteBindingsIntoRawSql($event->sql, $event->bindings),
         ]);
