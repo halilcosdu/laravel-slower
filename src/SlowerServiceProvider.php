@@ -71,7 +71,7 @@ class SlowerServiceProvider extends PackageServiceProvider
     {
         $model = config('slower.resources.model');
 
-        if (Str::contains($event->sql, [(new $model)->getTable()])) {
+        if (Str::contains($event->sql, config('slower.resources.table_name'))) {
             return;
         }
 
