@@ -54,7 +54,7 @@ public function up()
     Schema::create(config('slower.resources.table_name'), function (Blueprint $table) {
         $table->id();
         $table->boolean('is_analyzed')->default(false)->index();
-        $table->string('bindings');
+        $table->longtext('bindings');
         $table->longtext('sql');
         $table->unsignedInteger('time')->index();
         $table->string('connection');
