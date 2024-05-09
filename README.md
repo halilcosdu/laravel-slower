@@ -5,6 +5,10 @@
 [![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/halilcosdu/laravel-slower/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/halilcosdu/laravel-slower/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/halilcosdu/laravel-slower.svg?style=flat-square)](https://packagist.org/packages/halilcosdu/laravel-slower)
 
+
+<a href="https://trendshift.io/repositories/10023" target="_blank"><img src="https://trendshift.io/api/badge/repositories/10023" alt="halilcosdu%2Flaravel-slower | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+
+
 Laravel Slower is a powerful package designed for Laravel developers who want to enhance the performance of their applications. It intelligently identifies slow database queries and leverages AI to suggest optimal indexing strategies and other performance improvements. Whether you're debugging or routinely monitoring your application, Laravel Slower provides actionable insights to streamline database interactions.
 
 ## Installation
