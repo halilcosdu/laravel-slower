@@ -23,6 +23,8 @@ php artisan vendor:publish --tag="slower-config"
 
 This is the contents of the published config file:
 
+You can disable AI recommendations by setting the `ai_recommendation` key to `false` in the config file. If you disable AI recommendations, the package will not make any API requests to OpenAI.
+
 ```php
 <?php
 
