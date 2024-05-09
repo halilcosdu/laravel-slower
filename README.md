@@ -156,6 +156,11 @@ Remember to periodically maintain your index to keep up with the CRUD operations
 composer test
 ```
 
+## Roadmap
+
+- [ ] Create a documentation page.
+- [ ] Begin development of version 2.
+
 ## Changelog
 
 Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
