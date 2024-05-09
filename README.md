@@ -161,6 +161,7 @@ composer test
 - [ ] Create a documentation page.
 - [ ] Begin development of version 2.
 - [ ] Auto Indexer (Premium Feature)
+- [ ] Create a FilamentPHP plugin.
 
 ## Changelog
 
