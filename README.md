@@ -91,6 +91,9 @@ php artisan slower:analyze /*Analyze the records where is_analyzed=false*/
 ```
 
 ```php
+    use HalilCosdu\Slower\Commands\AnalyzeQuery;
+    use HalilCosdu\Slower\Commands\SlowLogCleaner;
+
     protected $commands = [
         AnalyzeQuery::class,
         SlowLogCleaner::class,
