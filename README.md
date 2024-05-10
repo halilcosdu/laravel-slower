@@ -59,6 +59,9 @@ You can publish and run the migrations with:
 
 ```bash
 php artisan vendor:publish --tag="slower-migrations"
+```
+
+```bash
 php artisan migrate
 ```
 
