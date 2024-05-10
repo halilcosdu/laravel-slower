@@ -38,12 +38,12 @@ use HalilCosdu\Slower\Models\SlowLog;
 
 return [
     'enabled' => env('SLOWER_ENABLED', true),
-    'threshold' => env('SLOWER_THRESHOLD', 10000),
+    'threshold' => env('SLOWER_THRESHOLD', 10000),// Set null to capture all queries
     'resources' => [
         'table_name' => (new SlowLog)->getTable(),
         'model' => SlowLog::class,
     ],
-    'ai_recommendation' => env('SLOWER_AI_RECOMMENDATION', true),
+    'ai_recommendation' => env('SLOWER_AI_RECOMMENDATION', true), // Set to false to disable AI recommendations
     'recommendation_model' => env('SLOWER_AI_RECOMMENDATION_MODEL', 'gpt-4'),
     'open_ai' => [
         'api_key' => env('OPENAI_API_KEY'),
