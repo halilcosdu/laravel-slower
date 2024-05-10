@@ -70,9 +70,9 @@ public function up()
         $table->boolean('is_analyzed')->default(false)->index();
         $table->longtext('bindings');
         $table->longtext('sql');
-        $table->float('time')->index();
+        $table->float('time')->nullable()->index();
         $table->string('connection');
-        $table->string('connection_name');
+        $table->string('connection_name')->nullable();
         $table->longtext('raw_sql');
         $table->longtext('recommendation')->nullable();
 
