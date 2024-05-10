@@ -37,7 +37,7 @@ class SlowLog extends Model
         return [
             'is_analyzed' => 'boolean',
             'bindings' => 'array',
-            'time' => 'integer',
+            'time' => 'float',
         ];
     }
 }

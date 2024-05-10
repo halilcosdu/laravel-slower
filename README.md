@@ -70,7 +70,7 @@ public function up()
         $table->boolean('is_analyzed')->default(false)->index();
         $table->longtext('bindings');
         $table->longtext('sql');
-        $table->unsignedInteger('time')->index();
+        $table->float('time')->index();
         $table->string('connection');
         $table->string('connection_name');
         $table->longtext('raw_sql');
