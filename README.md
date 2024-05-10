@@ -124,6 +124,12 @@ dd($model->raw_sql); /*select count(*) as aggregate from "product_prices" where 
 
 dd($model->recommendation);
 ```
+### Example Screen
+
+<a href="https://i.ibb.co/J2xvB1y/Screenshot-2024-05-11-at-00-24-52.png">
+<img src="https://i.ibb.co/J2xvB1y/Screenshot-2024-05-11-at-00-24-52.png" alt="Screenshot" style="width:100%;">
+</a>
+
 ### Example Recommendation
 In order to improve database performance and scalability, here are some suggestions below:
 
