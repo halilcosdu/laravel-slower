@@ -43,7 +43,7 @@ class RecommendationService
 
     private function extractIndexesAndSchemaFromRecord($record): array
     {
-        $schemaBuilder = DB::connection($record->connection)->getSchemaBuilder();
+        $schemaBuilder = DB::connection($record->connection_name)->getSchemaBuilder();
 
         $columns = $schemaBuilder->getColumnListing($record->getTable());
 
