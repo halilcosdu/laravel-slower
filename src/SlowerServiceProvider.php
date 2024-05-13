@@ -60,6 +60,14 @@ class SlowerServiceProvider extends PackageServiceProvider
     {
         if (config('slower.enabled')) {
             DB::whenQueryingForLongerThan(config('slower.threshold', 10000), function (Connection $connection, QueryExecuted $event) {
+                if(config('slower.ignore_explain_queries', true) && Str::startsWith($event->sql, 'EXPLAIN')) {
+                    return;
+                }
+
+                if(config('slower.ignore_insert_queries', true) && stripos($event->sql, 'insert') === 0) {
+                    return;
+                }
+
                 $this->createRecord($event, $connection);
                 $this->notify($event, $connection);
             });

@@ -14,20 +14,24 @@ class RecommendationService
 
     public function getRecommendation($record): ?string
     {
+        $schema = $this->extractIndexesAndSchemaFromRecord($record);
+        $userMessage = 'The query execution took ' . $record->time . ' milliseconds.' . PHP_EOL .
+            'Connection: ' . $record->connection . PHP_EOL .
+            'Connection Name: ' . $record->connection_name . PHP_EOL .
+            'Schema: ' . json_encode($schema, JSON_PRETTY_PRINT) . PHP_EOL .
+            'Sql: ' . $record->raw_sql . PHP_EOL;
 
-        [$indexes, $schema] = $this->extractIndexesAndSchemaFromRecord($record);
+        if (config('slower.recommendation_use_explain', false)) {
+            $plan = collect(DB::select('explain analyse ' . $record->raw_sql))->implode('QUERY PLAN', PHP_EOL);
+
+            $userMessage .= 'EXPLAIN ANALYSE output: ' . $plan . PHP_EOL;
+        }
 
         $result = $this->client->chat()->create([
             'model' => config('slower.recommendation_model', 'gpt-4'),
             'messages' => [
                 ['role' => 'system', 'content' => config('slower.prompt')],
-                ['role' => 'user', 'content' => 'The query execution took '.$record->time.' milliseconds.'.PHP_EOL.
-                    'Connection: '.$record->connection.PHP_EOL.
-                    'Current Indexes: '.json_encode($indexes, JSON_PRETTY_PRINT).PHP_EOL.
-                    'Schema: '.json_encode($schema, JSON_PRETTY_PRINT).PHP_EOL.
-                    'Connection Name: '.$record->connection_name.PHP_EOL.
-                    'Sql: '.$record->raw_sql,
-                ],
+                ['role' => 'user', 'content' => $userMessage],
             ],
         ]);
 
@@ -43,18 +47,36 @@ class RecommendationService
 
     private function extractIndexesAndSchemaFromRecord($record): array
     {
-        $schemaBuilder = DB::connection($record->getConnectionName())->getSchemaBuilder();
-
-        $columns = $schemaBuilder->getColumnListing($record->getTable());
-
-        $indexes = $schemaBuilder->getIndexes($record->getTable());
+        $schemaBuilder = DB::connection($record->connection_name)->getSchemaBuilder();
 
         $schema = [];
 
-        foreach ($columns as $column) {
-            $schema[$column] = $schemaBuilder->getColumnType($record->getTable(), $column);
+        $tables = $this->getTableNamesFromRawQuery($record->raw_sql);
+        foreach ($tables as $tableName) {
+            $columns = $schemaBuilder->getColumnListing($tableName);
+            $schema[$tableName]['indexes'] = $schemaBuilder->getIndexes($tableName);
+
+            foreach ($columns as $column) {
+                $schema[$tableName]['columns'][] = [$column => $schemaBuilder->getColumnType($tableName, $column)];
+            }
         }
 
-        return [$indexes, $schema];
+        return $schema;
+    }
+
+    private function getTableNamesFromRawQuery(string $sqlQuery): array
+    {
+        // Regular expression to match table names
+        $pattern = '/(?:FROM|JOIN|INTO|UPDATE)\s+(\S+)(?:\s+(?:AS\s+)?\w+)?(?:\s+ON\s+[^ ]+)?/i';
+
+        preg_match_all($pattern, $sqlQuery, $matches);
+
+        // Extract table names from the matches
+        $tableNames = [];
+        foreach ($matches[1] as $tableName) {
+            $tableNames[] = str_replace(['`', '"'], '', $tableName);
+        }
+
+        return array_unique($tableNames);
     }
 }
