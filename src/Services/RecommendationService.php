@@ -19,7 +19,7 @@ class RecommendationService
             'Connection: ' . $record->connection . PHP_EOL .
             'Connection Name: ' . $record->connection_name . PHP_EOL .
             'Schema: ' . json_encode($schema, JSON_PRETTY_PRINT) . PHP_EOL .
-            'Sql: ' . $record->raw_sql . PHP_EOL;
+            'Sql: ' . $record->sql . PHP_EOL;
 
         if (config('slower.recommendation_use_explain', false)) {
             $plan = collect(DB::select('explain analyse ' . $record->raw_sql))->implode('QUERY PLAN', PHP_EOL);
