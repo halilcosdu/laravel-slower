@@ -26,7 +26,7 @@
     "require": {
         "php": "^8.2",
         "illuminate/contracts": "^10.0||^11.0",
-        "openai-php/laravel": "^0.8.1",
+        "openai-php/laravel": "^0.9.1",
         "spatie/laravel-package-tools": "^1.16"
     },
     "require-dev": {
