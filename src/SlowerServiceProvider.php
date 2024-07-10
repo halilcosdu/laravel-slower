@@ -59,9 +59,21 @@ class SlowerServiceProvider extends PackageServiceProvider
     private function registerDatabaseListener(): void
     {
         if (config('slower.enabled')) {
-            DB::whenQueryingForLongerThan(config('slower.threshold', 10000), function (Connection $connection, QueryExecuted $event) {
-                $this->createRecord($event, $connection);
-                $this->notify($event, $connection);
+            DB::listen(function (QueryExecuted $event) {
+                if($event->time < config('slower.threshold', 10000)) {
+                    return;
+                }
+
+                if(config('slower.ignore_explain_queries', true) && Str::startsWith($event->sql, 'EXPLAIN')) {
+                    return;
+                }
+
+                if(config('slower.ignore_insert_queries', true) && stripos($event->sql, 'insert') === 0) {
+                    return;
+                }
+
+                $this->createRecord($event, $event->connection);
+                $this->notify($event, $event->connection);
             });
         }
     }
