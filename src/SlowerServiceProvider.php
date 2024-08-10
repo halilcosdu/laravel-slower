@@ -60,15 +60,15 @@ class SlowerServiceProvider extends PackageServiceProvider
     {
         if (config('slower.enabled')) {
             DB::listen(function (QueryExecuted $event) {
-                if($event->time < config('slower.threshold', 10000)) {
+                if ($event->time < config('slower.threshold', 10000)) {
                     return;
                 }
 
-                if(config('slower.ignore_explain_queries', true) && Str::startsWith($event->sql, 'EXPLAIN')) {
+                if (config('slower.ignore_explain_queries', true) && Str::startsWith($event->sql, 'EXPLAIN')) {
                     return;
                 }
 
-                if(config('slower.ignore_insert_queries', true) && stripos($event->sql, 'insert') === 0) {
+                if (config('slower.ignore_insert_queries', true) && stripos($event->sql, 'insert') === 0) {
                     return;
                 }
 
