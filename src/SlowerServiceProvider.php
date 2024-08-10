@@ -48,7 +48,7 @@ class SlowerServiceProvider extends PackageServiceProvider
             $openAI = OpenAIFactory::factory()
                 ->withApiKey($apiKey)
                 ->withOrganization($organization)
-                ->withHttpHeader('OpenAI-Beta', 'assistants=v1')
+                ->withHttpHeader('OpenAI-Beta', 'assistants=v2')
                 ->withHttpClient(new \GuzzleHttp\Client(['timeout' => $timeout]))
                 ->make();
 
