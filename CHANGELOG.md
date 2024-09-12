@@ -2,6 +2,21 @@
 
 All notable changes to `laravel-slower` will be documented in this file.
 
+## v2.0.0 - 2024-09-12
+
+### What's Changed
+
+* Update openai-php/laravel requirement from ^0.8.1 to ^0.9.1 by @dependabot in https://github.com/halilcosdu/laravel-slower/pull/18
+* Update openai-php/laravel requirement from ^0.9.1 to ^0.10.1 by @dependabot in https://github.com/halilcosdu/laravel-slower/pull/19
+* Bump dependabot/fetch-metadata from 2.1.0 to 2.2.0 by @dependabot in https://github.com/halilcosdu/laravel-slower/pull/21
+* Added explain analyze query plan to recommendation prompt by @dimafe6 in https://github.com/halilcosdu/laravel-slower/pull/17
+
+### New Contributors
+
+* @dimafe6 made their first contribution in https://github.com/halilcosdu/laravel-slower/pull/17
+
+**Full Changelog**: https://github.com/halilcosdu/laravel-slower/compare/v1.1.1...v2.0.0
+
 ## v1.1.1 - 2024-05-10
 
 **Full Changelog**: https://github.com/halilcosdu/laravel-slower/compare/v1.1.0...v1.1.1
