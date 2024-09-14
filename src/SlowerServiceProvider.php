@@ -2,6 +2,8 @@
 
 namespace HalilCosdu\Slower;
 
+use HalilCosdu\Slower\AiServiceDrivers\AiServiceManager;
+use HalilCosdu\Slower\AiServiceDrivers\Contracts\AiServiceDriver;
 use HalilCosdu\Slower\Commands\AnalyzeQuery;
 use HalilCosdu\Slower\Commands\SlowLogCleaner;
 use HalilCosdu\Slower\Services\RecommendationService;
@@ -33,27 +35,10 @@ class SlowerServiceProvider extends PackageServiceProvider
     public function packageRegistered(): void
     {
         $this->registerDatabaseListener();
-
-        $this->app->singleton(RecommendationService::class, function () {
-            $apiKey = config('slower.open_ai.api_key');
-            $organization = config('slower.open_ai.organization');
-            $timeout = config('slower.open_ai.request_timeout', 30);
-
-            if (! is_string($apiKey) || ($organization !== null && ! is_string($organization))) {
-                throw new InvalidArgumentException(
-                    'The OpenAI API Key is missing. Please publish the [slower.php] configuration file and set the [api_key].'
-                );
-            }
-
-            $openAI = OpenAIFactory::factory()
-                ->withApiKey($apiKey)
-                ->withOrganization($organization)
-                ->withHttpHeader('OpenAI-Beta', 'assistants=v2')
-                ->withHttpClient(new \GuzzleHttp\Client(['timeout' => $timeout]))
-                ->make();
-
-            return new RecommendationService($openAI);
-        });
+        $this->app->singleton(
+            AiServiceDriver::class,
+            fn () => app(AiServiceManager::class)->driver(config('slower.ai_service', 'openai'))
+        );
     }
 
     private function registerDatabaseListener(): void

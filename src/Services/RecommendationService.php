@@ -2,14 +2,14 @@
 
 namespace HalilCosdu\Slower\Services;
 
+use HalilCosdu\Slower\AiServiceDrivers\Contracts\AiServiceDriver;
 use Illuminate\Support\Facades\DB;
-use OpenAI\Client;
 
 class RecommendationService
 {
-    public function __construct(protected Client $client)
+    public function __construct(protected AiServiceDriver $aiService)
     {
-        //
+
     }
 
     public function getRecommendation($record): ?string
@@ -27,22 +27,13 @@ class RecommendationService
             $userMessage .= 'EXPLAIN ANALYSE output: '.$plan.PHP_EOL;
         }
 
-        $result = $this->client->chat()->create([
-            'model' => config('slower.recommendation_model', 'gpt-4'),
-            'messages' => [
-                ['role' => 'system', 'content' => config('slower.prompt')],
-                ['role' => 'user', 'content' => $userMessage],
-            ],
-        ]);
-
-        $record->update(
-            [
+        return tap(
+            $this->aiService->analyze($userMessage),
+            static fn($result) => $record->update([
                 'is_analyzed' => true,
-                'recommendation' => $result->choices[0]->message->content,
-            ]
+                'recommendation' => $result,
+            ])
         );
-
-        return $result->choices[0]->message->content;
     }
 
     private function extractIndexesAndSchemaFromRecord($record): array
