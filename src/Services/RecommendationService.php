@@ -7,10 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 class RecommendationService
 {
-    public function __construct(protected AiServiceDriver $aiService)
-    {
-
-    }
+    public function __construct(protected AiServiceDriver $aiService) {}
 
     public function getRecommendation($record): ?string
     {
@@ -29,7 +26,7 @@ class RecommendationService
 
         return tap(
             $this->aiService->analyze($userMessage),
-            static fn($result) => $record->update([
+            static fn ($result) => $record->update([
                 'is_analyzed' => true,
                 'recommendation' => $result,
             ])

@@ -48,7 +48,6 @@ describe('analyze', function () {
     });
 });
 
-
 describe('ai-service', function () {
     it('returns an instance of the configured driver', function () {
         expect(

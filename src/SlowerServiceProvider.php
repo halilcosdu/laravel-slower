@@ -6,13 +6,10 @@ use HalilCosdu\Slower\AiServiceDrivers\AiServiceManager;
 use HalilCosdu\Slower\AiServiceDrivers\Contracts\AiServiceDriver;
 use HalilCosdu\Slower\Commands\AnalyzeQuery;
 use HalilCosdu\Slower\Commands\SlowLogCleaner;
-use HalilCosdu\Slower\Services\RecommendationService;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use InvalidArgumentException;
-use OpenAI as OpenAIFactory;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 

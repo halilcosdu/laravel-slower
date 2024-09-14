@@ -7,9 +7,7 @@ use OpenAI\Client;
 
 class OpenAiDriver implements AiServiceDriver
 {
-    public function __construct(protected Client $client)
-    {
-    }
+    public function __construct(protected Client $client) {}
 
     public function analyze(string $userMessage): ?string
     {
@@ -20,6 +18,7 @@ class OpenAiDriver implements AiServiceDriver
                 ['role' => 'user', 'content' => $userMessage],
             ],
         ]);
+
         return $result->choices[0]->message->content ?? null;
     }
 }
