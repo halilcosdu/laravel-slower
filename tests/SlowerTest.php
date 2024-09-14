@@ -1,5 +1,7 @@
 <?php
 
+use HalilCosdu\Slower\AiServiceDrivers\AiServiceManager;
+use HalilCosdu\Slower\AiServiceDrivers\Contracts\AiServiceDriver;
 use HalilCosdu\Slower\Services\RecommendationService;
 use HalilCosdu\Slower\Slower;
 
@@ -43,5 +45,14 @@ describe('analyze', function () {
         $this->mockedRecommendationService->shouldReceive('getRecommendation')->once()->with($mockedModel);
         $result = $this->slower->analyze($mockedModel);
         expect($result)->toBe($expectedResult);
+    });
+});
+
+
+describe('ai-service', function () {
+    it('returns an instance of the configured driver', function () {
+        expect(
+            app(AiServiceManager::class)->driver(config('slower.ai_service'))
+        )->toBeInstanceOf(AiServiceDriver::class);
     });
 });

@@ -7,6 +7,7 @@ use HalilCosdu\Slower\Models\SlowLog;
 return [
     'enabled' => env('SLOWER_ENABLED', true),
     'threshold' => env('SLOWER_THRESHOLD', 10000),
+    'ai_service' => env('SLOWER_AI_SERVICE', 'openai'),
     'resources' => [
         'table_name' => (new SlowLog)->getTable(),
         'model' => SlowLog::class,
