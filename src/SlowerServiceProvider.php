@@ -87,7 +87,7 @@ class SlowerServiceProvider extends PackageServiceProvider
         }
 
         (new $model)::query()->create([
-            'bindings' => $event->bindings,
+            'bindings' => json_encode($event->bindings),
             'sql' => $event->sql,
             'time' => $event->time,
             'connection' => get_class($event->connection),
