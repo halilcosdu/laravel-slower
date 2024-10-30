@@ -2,6 +2,10 @@
 
 All notable changes to `laravel-slower` will be documented in this file.
 
+## v2.0.1 - 2024-10-30
+
+**Full Changelog**: https://github.com/halilcosdu/laravel-slower/compare/v2.0.0...v2.0.1
+
 ## v2.0.0 - 2024-09-12
 
 ### What's Changed
