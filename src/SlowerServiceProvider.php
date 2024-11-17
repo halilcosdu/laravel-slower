@@ -68,14 +68,18 @@ class SlowerServiceProvider extends PackageServiceProvider
             return;
         }
 
-        (new $model)::query()->create([
-            'bindings' => $event->bindings,
-            'sql' => $event->sql,
-            'time' => $event->time,
-            'connection' => get_class($event->connection),
-            'connection_name' => $event->connectionName,
-            'raw_sql' => $connection->getQueryGrammar()->substituteBindingsIntoRawSql($event->sql, $event->bindings),
-        ]);
+        try {
+            (new $model)::query()->create([
+                'bindings' => $event->bindings,
+                'sql' => $event->sql,
+                'time' => $event->time,
+                'connection' => get_class($event->connection),
+                'connection_name' => $event->connectionName,
+                'raw_sql' => $connection->getQueryGrammar()->substituteBindingsIntoRawSql($event->sql, $event->bindings),
+            ]);
+        } catch (\Exception $e) {
+            //
+        }
     }
 
     private function notify(QueryExecuted $event, Connection $connection)

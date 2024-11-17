@@ -7,7 +7,9 @@ use OpenAI\Client;
 
 class OpenAiDriver implements AiServiceDriver
 {
-    public function __construct(protected Client $client) {}
+    public function __construct(protected Client $client)
+    {
+    }
 
     public function analyze(string $userMessage): ?string
     {
