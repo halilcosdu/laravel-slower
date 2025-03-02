@@ -2,6 +2,15 @@
 
 All notable changes to `laravel-slower` will be documented in this file.
 
+## L12 Support added. - 2025-03-02
+
+### What's Changed
+
+* Bump dependabot/fetch-metadata from 2.2.0 to 2.3.0 by @dependabot in https://github.com/halilcosdu/laravel-slower/pull/29
+* Bump aglipanci/laravel-pint-action from 2.4 to 2.5 by @dependabot in https://github.com/halilcosdu/laravel-slower/pull/30
+
+**Full Changelog**: https://github.com/halilcosdu/laravel-slower/compare/v2.0.2...v2.0.3
+
 ## v2.0.2 - 2024-11-17
 
 **Full Changelog**: https://github.com/halilcosdu/laravel-slower/compare/v2.0.0...v2.0.2
