@@ -11,6 +11,11 @@
 
 Laravel Slower is a powerful package designed for Laravel developers who want to enhance the performance of their applications. It intelligently identifies slow database queries and leverages AI to suggest optimal indexing strategies and other performance improvements. Whether you're debugging or routinely monitoring your application, Laravel Slower provides actionable insights to streamline database interactions.
 
+## Requirements
+
+- PHP 8.2 or higher
+- Laravel 10.x, 11.x, or 12.x
+
 ## Installation
 
 You can install the package via composer:
