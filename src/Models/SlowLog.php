@@ -8,11 +8,12 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * @property int $id
+ * @property bool $is_analyzed
  * @property string $bindings
  * @property string $connection_name
  * @property string $raw_sql
  * @property string $sql
- * @property int $time
+ * @property float $time
  * @property string $connection
  * @property Carbon $created_at
  * @property Carbon $updated_at

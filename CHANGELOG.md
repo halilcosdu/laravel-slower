@@ -2,10 +2,13 @@
 
 All notable changes to `laravel-slower` will be documented in this file.
 
-## L12 Support added. - 2025-03-02
+## Laravel 12 Support - 2025-11-05
 
 ### What's Changed
 
+* Added Laravel 12 support to composer.json dependencies
+* Updated GitHub Actions CI workflow to test against Laravel 12.x with Orchestra Testbench 10.x
+* Package now supports Laravel 10.x, 11.x, and 12.x
 * Bump dependabot/fetch-metadata from 2.2.0 to 2.3.0 by @dependabot in https://github.com/halilcosdu/laravel-slower/pull/29
 * Bump aglipanci/laravel-pint-action from 2.4 to 2.5 by @dependabot in https://github.com/halilcosdu/laravel-slower/pull/30
 
