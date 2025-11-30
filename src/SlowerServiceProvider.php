@@ -98,7 +98,6 @@ class SlowerServiceProvider extends PackageServiceProvider
             return $bindings;
         }
 
-        /** @phpstan-ignore identical.alwaysFalse */
         if (is_null($bindings)) {
             return [];
         }

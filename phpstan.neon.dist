@@ -8,5 +8,4 @@ parameters:
         - config
         - database
     tmpDir: build/phpstan
-    checkMissingIterableValueType: false
 
