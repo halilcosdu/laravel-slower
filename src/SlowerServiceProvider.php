@@ -68,18 +68,42 @@ class SlowerServiceProvider extends PackageServiceProvider
             return;
         }
 
+        $bindings = $this->normalizeBindings($event->bindings);
+
         try {
             (new $model)::query()->create([
-                'bindings' => $event->bindings,
+                'bindings' => $bindings,
                 'sql' => $event->sql,
                 'time' => $event->time,
                 'connection' => get_class($event->connection),
                 'connection_name' => $event->connectionName,
-                'raw_sql' => $connection->getQueryGrammar()->substituteBindingsIntoRawSql($event->sql, $event->bindings),
+                'raw_sql' => $connection->getQueryGrammar()->substituteBindingsIntoRawSql($event->sql, $bindings),
             ]);
         } catch (\Exception $e) {
             //
         }
+    }
+
+    /**
+     * Normalize bindings to array format.
+     *
+     * Laravel documents QueryExecuted::$bindings as array, but some custom
+     * drivers or special queries may provide string or null values.
+     *
+     * @return array<int, mixed>
+     */
+    private function normalizeBindings(mixed $bindings): array
+    {
+        if (is_array($bindings)) {
+            return $bindings;
+        }
+
+        /** @phpstan-ignore identical.alwaysFalse */
+        if (is_null($bindings)) {
+            return [];
+        }
+
+        return [$bindings];
     }
 
     private function notify(QueryExecuted $event, Connection $connection)

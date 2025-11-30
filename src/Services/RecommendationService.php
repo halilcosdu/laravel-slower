@@ -7,7 +7,9 @@ use Illuminate\Support\Facades\DB;
 
 class RecommendationService
 {
-    public function __construct(protected AiServiceDriver $aiService) {}
+    public function __construct(protected AiServiceDriver $aiService)
+    {
+    }
 
     public function getRecommendation($record): ?string
     {
