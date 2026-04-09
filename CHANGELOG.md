@@ -2,6 +2,15 @@
 
 All notable changes to `laravel-slower` will be documented in this file.
 
+## Laravel 13 Support - 2026-04-09
+
+### What's Changed
+
+* Added Laravel 13 support to composer.json dependencies
+* Updated GitHub Actions CI workflow to test against Laravel 13.x with Orchestra Testbench 11.x
+* Updated Pest and plugin version constraints for PHPUnit 11+ compatibility
+* Package now supports Laravel 10.x, 11.x, 12.x, and 13.x
+
 ## Laravel 12 Support - 2025-11-05
 
 ### What's Changed

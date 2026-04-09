@@ -14,7 +14,7 @@ Laravel Slower is a powerful package designed for Laravel developers who want to
 ## Requirements
 
 - PHP 8.2 or higher
-- Laravel 10.x, 11.x, or 12.x
+- Laravel 10.x, 11.x, 12.x, or 13.x
 
 ## Installation
 
