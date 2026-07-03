@@ -19,18 +19,80 @@ class RecommendationService
             'Sql: '.$record->sql.PHP_EOL;
 
         if (config('slower.recommendation_use_explain', false)) {
-            $plan = collect(DB::select('explain analyse '.$record->raw_sql))->implode('QUERY PLAN', PHP_EOL);
-
-            $userMessage .= 'EXPLAIN ANALYSE output: '.$plan.PHP_EOL;
+            if ($plan = $this->getExplainPlan($record)) {
+                $userMessage .= 'EXPLAIN output: '.$plan.PHP_EOL;
+            }
         }
 
-        return tap(
-            $this->aiService->analyze($userMessage),
-            static fn ($result) => $record->update([
+        $recommendation = $this->aiService->analyze($userMessage);
+
+        // Only mark the record as analyzed when we actually received a
+        // recommendation. Empty results stay retryable so that scheduled
+        // `slower:analyze` runs get another chance at them instead of being
+        // silently finalized.
+        if (! empty($recommendation)) {
+            $record->update([
                 'is_analyzed' => true,
-                'recommendation' => $result,
-            ])
-        );
+                'recommendation' => $recommendation,
+            ]);
+        }
+
+        return $recommendation;
+    }
+
+    /**
+     * Build a safe, non-executing EXPLAIN plan for the captured query.
+     *
+     * Important: this deliberately only ever uses EXPLAIN (never EXPLAIN
+     * ANALYZE). EXPLAIN ANALYZE actually runs the query, which is dangerous
+     * against captured production SQL such as UPDATE/DELETE statements. The
+     * statement form is chosen per database driver; unsupported drivers and
+     * suspicious (multi-statement) input are skipped, and any EXPLAIN failure
+     * is reported without breaking the analysis flow.
+     */
+    private function getExplainPlan($record): ?string
+    {
+        $rawSql = $record->raw_sql;
+
+        // Defensive guard: never explain anything that looks like more than one statement.
+        if (str_contains($rawSql, ';')) {
+            return null;
+        }
+
+        try {
+            $connection = DB::connection($record->connection_name);
+            $driver = $connection->getDriverName();
+        } catch (\Throwable $e) {
+            report(new \RuntimeException('Slower could not resolve the query connection for EXPLAIN: '.$e->getMessage(), 0, $e));
+
+            return null;
+        }
+
+        $explainSql = match ($driver) {
+            'pgsql', 'mysql' => 'EXPLAIN '.$rawSql,
+            'sqlite' => 'EXPLAIN QUERY PLAN '.$rawSql,
+            default => null,
+        };
+
+        if ($explainSql === null) {
+            return null;
+        }
+
+        try {
+            return collect($connection->select($explainSql))
+                ->map(static function ($row) {
+                    if (property_exists($row, 'QUERY PLAN')) {
+                        return $row->{'QUERY PLAN'};
+                    }
+
+                    return json_encode((array) $row);
+                })
+                ->implode(PHP_EOL) ?: null;
+        } catch (\Throwable $e) {
+            report(new \RuntimeException('Slower EXPLAIN failed: '.$e->getMessage(), 0, $e));
+
+            return null;
+        }
     }
 
     private function extractIndexesAndSchemaFromRecord($record): array

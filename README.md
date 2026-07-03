@@ -44,12 +44,13 @@ use HalilCosdu\Slower\Models\SlowLog;
 return [
     'enabled' => env('SLOWER_ENABLED', true),
     'threshold' => env('SLOWER_THRESHOLD', 10000),
+    'ai_service' => env('SLOWER_AI_SERVICE', 'openai'),
     'resources' => [
         'table_name' => (new SlowLog)->getTable(),
         'model' => SlowLog::class,
     ],
     'ai_recommendation' => env('SLOWER_AI_RECOMMENDATION', true),
-    'recommendation_model' => env('SLOWER_AI_RECOMMENDATION_MODEL', 'gpt-4'),
+    'recommendation_model' => env('SLOWER_AI_RECOMMENDATION_MODEL', 'gpt-5.4-mini'),
     'recommendation_use_explain' => env('SLOWER_AI_RECOMMENDATION_USE_EXPLAIN', true),
     'ignore_explain_queries' => env('SLOWER_IGNORE_EXPLAIN_QUERIES', true),
     'ignore_insert_queries' => env('SLOWER_IGNORE_INSERT_QUERIES', true),
@@ -58,10 +59,24 @@ return [
         'organization' => env('OPENAI_ORGANIZATION'),
         'request_timeout' => env('OPENAI_TIMEOUT'),
     ],
-    'prompt' => env('SLOWER_PROMPT', 'As a distinguished database optimization expert, your expertise is invaluable for refining SQL queries to achieve maximum efficiency. Schema json provide list of indexes and column definitions for each table in query. Also analyse the output of EXPLAIN ANALYSE and provide recommendations to optimize query. Please examine the SQL statement provided below including EXPLAIN ANALYSE query plan. Based on your analysis, could you recommend sophisticated indexing techniques or query modifications that could significantly improve performance and scalability?'),
+    'prompt' => env('SLOWER_PROMPT', 'As a distinguished database optimization expert, your expertise is invaluable for refining SQL queries to achieve maximum efficiency. Schema json provide list of indexes and column definitions for each table in query. Also analyse the output of EXPLAIN and provide recommendations to optimize query. Please examine the SQL statement provided below including EXPLAIN query plan. Based on your analysis, could you recommend sophisticated indexing techniques or query modifications that could significantly improve performance and scalability?'),
 ];
 
 ```
+
+#### AI service driver
+
+The `ai_service` key selects the underlying AI provider. The default is `openai`. The OpenAI driver uses [openai-php/laravel](https://github.com/openai-php/laravel) and reads its credentials from the `open_ai` block above. To implement a custom provider, implement `HalilCosdu\Slower\AiServiceDrivers\Contracts\AiServiceDriver`, register a `create{Name}Driver()` method on `AiServiceManager`, and set `SLOWER_AI_SERVICE={name}`.
+
+#### Recommendation model
+
+The default `recommendation_model` is `gpt-5.4-mini` (a currently-supported, low-cost model). To keep the previous behaviour, pin the model explicitly in your `.env`:
+
+```dotenv
+SLOWER_AI_RECOMMENDATION_MODEL=gpt-4
+```
+
+> **Note:** `gpt-4` is scheduled to be shut down on 2026-10-23 — see the [OpenAI deprecations](https://platform.openai.com/docs/deprecations) page. Migrating to a current model is recommended.
 
 You can publish and run the migrations with:
 
@@ -132,12 +147,6 @@ dd($model->raw_sql); /*select count(*) as aggregate from "product_prices" where 
 
 dd($model->recommendation);
 ```
-### Example Screen
-
-<a href="https://i.ibb.co/J2xvB1y/Screenshot-2024-05-11-at-00-24-52.png">
-<img src="https://i.ibb.co/J2xvB1y/Screenshot-2024-05-11-at-00-24-52.png" alt="Screenshot" style="width:100%;">
-</a>
-
 ### Example Recommendation
 In order to improve database performance and scalability, here are some suggestions below:
 

@@ -16,7 +16,7 @@ class SlowLogCleaner extends Command
 
         (new $model)::query()
             ->where('created_at', '<', now()->subDays(intval($this->argument('days'))))
-            ->chunk(1000, function ($logs) {
+            ->chunkById(1000, function ($logs) {
                 $logs->each->delete();
             });
 

@@ -79,8 +79,10 @@ class SlowerServiceProvider extends PackageServiceProvider
                 'connection_name' => $event->connectionName,
                 'raw_sql' => $connection->getQueryGrammar()->substituteBindingsIntoRawSql($event->sql, $bindings),
             ]);
-        } catch (\Exception $e) {
-            //
+        } catch (\Throwable $e) {
+            // Logging slow queries must never break the application's own request.
+            // We surface the failure (without the raw SQL, which may contain sensitive data).
+            report(new \RuntimeException('Failed to store slow query log: '.$e->getMessage(), 0, $e));
         }
     }
 
