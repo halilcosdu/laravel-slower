@@ -2,7 +2,7 @@
 
 All notable changes to `laravel-slower` will be documented in this file.
 
-## Unreleased
+## v2.2.0 - 2026-07-03
 
 ### Fixed
 - **Safe EXPLAIN handling.** Recommendation analysis now uses a non-executing `EXPLAIN` (never `EXPLAIN ANALYZE`), resolves the captured query's own connection, picks the correct statement form per database driver (`pgsql`/`mysql` → `EXPLAIN`, `sqlite` → `EXPLAIN QUERY PLAN`), skips multi-statement input, and reports EXPLAIN failures without breaking the analysis flow. Previously, `explain analyse` was run unconditionally, which both fails on MySQL/SQLite and can execute the underlying query against production data.
