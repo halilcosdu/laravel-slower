@@ -2,6 +2,24 @@
 
 All notable changes to `laravel-slower` will be documented in this file.
 
+## Unreleased
+
+### Fixed
+- **Safe EXPLAIN handling.** Recommendation analysis now uses a non-executing `EXPLAIN` (never `EXPLAIN ANALYZE`), resolves the captured query's own connection, picks the correct statement form per database driver (`pgsql`/`mysql` → `EXPLAIN`, `sqlite` → `EXPLAIN QUERY PLAN`), skips multi-statement input, and reports EXPLAIN failures without breaking the analysis flow. Previously, `explain analyse` was run unconditionally, which both fails on MySQL/SQLite and can execute the underlying query against production data.
+- **Retryable recommendations.** A record is only marked `is_analyzed` when the AI actually returns a recommendation. Empty results stay `is_analyzed=false` so they are retried on the next `slower:analyze` run instead of being silently finalized. The command now reports an `Analyzed | Skipped` summary.
+- **No more swallowed errors.** `SlowerServiceProvider::createRecord` now reports failures (via `report()` without the raw SQL) instead of silently discarding them, and catches `Throwable` so logging slow queries can never break the application's own request.
+- **Correct cleanup iteration.** `slower:clean` and `slower:analyze` now use `chunkById` to avoid skipping records when the result set changes during iteration.
+
+### Changed
+- **Default recommendation model** changed from the deprecated `gpt-4` (shut down 2026-10-23) to `gpt-5.4-mini`. Pin `SLOWER_AI_RECOMMENDATION_MODEL=gpt-4` to keep the previous behaviour.
+- **PHP 8.4** is now part of the CI test matrix.
+- `openai-php/laravel` constraint raised to `^0.18.0`, and `dependabot/fetch-metadata` bumped to `2.5.0`.
+
+### Documentation
+- README config example synchronized with `slower.php` (`ai_service` documented) and the OpenAI driver/contract extension point explained.
+- Removed the broken third-party screenshot hotlink.
+- `OpenAiDriver` now type-hints `OpenAI\Contracts\ClientContract` instead of the final concrete `Client`, so it can be substituted/faked in tests.
+
 ## Laravel 13 Support - 2026-04-09
 
 ### What's Changed

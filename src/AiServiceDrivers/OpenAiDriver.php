@@ -3,11 +3,11 @@
 namespace HalilCosdu\Slower\AiServiceDrivers;
 
 use HalilCosdu\Slower\AiServiceDrivers\Contracts\AiServiceDriver;
-use OpenAI\Client;
+use OpenAI\Contracts\ClientContract;
 
 class OpenAiDriver implements AiServiceDriver
 {
-    public function __construct(protected Client $client) {}
+    public function __construct(protected ClientContract $client) {}
 
     public function analyze(string $userMessage): ?string
     {

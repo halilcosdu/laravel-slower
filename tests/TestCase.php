@@ -27,10 +27,12 @@ class TestCase extends Orchestra
     public function getEnvironmentSetUp($app)
     {
         config()->set('database.default', 'testing');
+        // A fake key so the OpenAI driver can be resolved during tests without
+        // making any real HTTP calls.
+        config()->set('slower.open_ai.api_key', 'test-key');
 
-        /*
-        $migration = include __DIR__.'/../database/migrations/create_laravel_slower_table.php.stub';
+        // Ensure the slow log table exists for behavior tests that touch the DB.
+        $migration = include __DIR__.'/../database/migrations/create_slower_table.php.stub';
         $migration->up();
-        */
     }
 }

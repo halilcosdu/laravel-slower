@@ -1,5 +1,7 @@
 <?php
 
+use HalilCosdu\Slower\Models\SlowLog;
+
 describe('Config', function () {
     it('has default threshold value', function () {
         expect(config('slower.threshold'))->toBe(10000);
@@ -10,7 +12,7 @@ describe('Config', function () {
     });
 
     it('has default recommendation_model value', function () {
-        expect(config('slower.recommendation_model'))->toBe('gpt-4');
+        expect(config('slower.recommendation_model'))->toBe('gpt-5.4-mini');
     });
 
     it('has default enabled value', function () {
@@ -35,7 +37,7 @@ describe('Config', function () {
 
     it('has resources configuration', function () {
         expect(config('slower.resources.table_name'))->not->toBeNull();
-        expect(config('slower.resources.model'))->toBe(\HalilCosdu\Slower\Models\SlowLog::class);
+        expect(config('slower.resources.model'))->toBe(SlowLog::class);
     });
 
     it('has open_ai configuration keys', function () {

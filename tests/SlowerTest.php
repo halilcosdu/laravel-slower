@@ -2,6 +2,7 @@
 
 use HalilCosdu\Slower\Services\RecommendationService;
 use HalilCosdu\Slower\Slower;
+use Illuminate\Database\Eloquent\Model;
 
 beforeEach(function () {
     $this->mockedRecommendationService = Mockery::mock(RecommendationService::class);
@@ -9,7 +10,7 @@ beforeEach(function () {
 });
 describe('analyze', function () {
     it('throws an exception if the model is not an instance of the configured model', function () {
-        class TestModel extends Illuminate\Database\Eloquent\Model {}
+        class TestModel extends Model {}
         $mockedModel = Mockery::mock(TestModel::class);
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Model must be an instance of '.config('slower.resources.model'));
