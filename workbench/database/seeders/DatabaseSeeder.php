@@ -3,9 +3,8 @@
 namespace Workbench\Database\Seeders;
 
 use HalilCosdu\Slower\Models\SlowLog;
-use Illuminate\Database\MySqlConnection;
-use Illuminate\Database\PostgresConnection;
 use Illuminate\Database\Seeder;
+use Illuminate\Database\SQLiteConnection;
 
 class DatabaseSeeder extends Seeder
 {
@@ -32,8 +31,8 @@ MD;
                 'raw_sql' => "select * from `orders` where `status` = 'pending' and `created_at` >= '2026-06-01 00:00:00' order by `created_at` desc",
                 'bindings' => ['pending', '2026-06-01 00:00:00'],
                 'time' => 42180.4,
-                'connection' => MySqlConnection::class,
-                'connection_name' => 'mysql',
+                'connection' => SQLiteConnection::class,
+                'connection_name' => 'sqlite',
                 'is_analyzed' => true,
                 'recommendation' => $recommendation,
                 'created_at' => now()->subMinutes(42),
@@ -43,8 +42,8 @@ MD;
                 'raw_sql' => 'select count(*) as aggregate from `order_items` inner join `products` on `products`.`id` = `order_items`.`product_id` where `products`.`category_id` = 7',
                 'bindings' => [7],
                 'time' => 28442.0,
-                'connection' => MySqlConnection::class,
-                'connection_name' => 'mysql',
+                'connection' => SQLiteConnection::class,
+                'connection_name' => 'sqlite',
                 'is_analyzed' => false,
                 'created_at' => now()->subHours(2),
             ],
@@ -53,8 +52,8 @@ MD;
                 'raw_sql' => "select `users`.*, (select count(*) from `logins` where `logins`.`user_id` = `users`.`id`) as `logins_count` from `users` where `last_seen_at` > '2026-07-01 00:00:00'",
                 'bindings' => ['2026-07-01 00:00:00'],
                 'time' => 19305.7,
-                'connection' => MySqlConnection::class,
-                'connection_name' => 'mysql',
+                'connection' => SQLiteConnection::class,
+                'connection_name' => 'sqlite',
                 'is_analyzed' => true,
                 'recommendation' => $recommendation,
                 'created_at' => now()->subHours(5),
@@ -64,8 +63,8 @@ MD;
                 'raw_sql' => 'select * from "invoices" where "due_on" < \'2026-07-10\' and "settled_at" is null',
                 'bindings' => ['2026-07-10'],
                 'time' => 15990.2,
-                'connection' => PostgresConnection::class,
-                'connection_name' => 'pgsql',
+                'connection' => SQLiteConnection::class,
+                'connection_name' => 'sqlite',
                 'is_analyzed' => false,
                 'created_at' => now()->subHours(9),
             ],
@@ -74,8 +73,8 @@ MD;
                 'raw_sql' => "select `product_prices`.* from `product_prices` where `product_id` = '1' and `price` = '0' and `discount_total` > '0'",
                 'bindings' => ['1', '0', '0'],
                 'time' => 14210.9,
-                'connection' => MySqlConnection::class,
-                'connection_name' => 'mysql',
+                'connection' => SQLiteConnection::class,
+                'connection_name' => 'sqlite',
                 'is_analyzed' => true,
                 'recommendation' => $recommendation,
                 'created_at' => now()->subHours(14),
@@ -85,8 +84,8 @@ MD;
                 'raw_sql' => 'select * from "audit_events" where "payload" like \'%refund%\' order by "id" desc',
                 'bindings' => ['%refund%'],
                 'time' => 12844.1,
-                'connection' => PostgresConnection::class,
-                'connection_name' => 'pgsql',
+                'connection' => SQLiteConnection::class,
+                'connection_name' => 'sqlite',
                 'is_analyzed' => false,
                 'created_at' => now()->subDay(),
             ],
@@ -95,8 +94,8 @@ MD;
                 'raw_sql' => "update `carts` set `abandoned` = 1 where `updated_at` < '2026-07-04 00:00:00'",
                 'bindings' => [1, '2026-07-04 00:00:00'],
                 'time' => 11930.6,
-                'connection' => MySqlConnection::class,
-                'connection_name' => 'mysql',
+                'connection' => SQLiteConnection::class,
+                'connection_name' => 'sqlite',
                 'is_analyzed' => false,
                 'created_at' => now()->subDays(2),
             ],
@@ -105,8 +104,8 @@ MD;
                 'raw_sql' => "select distinct `sku` from `warehouse_stock` inner join `warehouses` on `warehouses`.`id` = `warehouse_stock`.`warehouse_id` where `warehouses`.`region` = 'eu-west' and `quantity` < 10",
                 'bindings' => ['eu-west', 10],
                 'time' => 10744.3,
-                'connection' => MySqlConnection::class,
-                'connection_name' => 'mysql',
+                'connection' => SQLiteConnection::class,
+                'connection_name' => 'sqlite',
                 'is_analyzed' => true,
                 'recommendation' => $recommendation,
                 'created_at' => now()->subDays(3),

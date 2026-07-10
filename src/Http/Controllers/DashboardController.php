@@ -3,6 +3,7 @@
 namespace HalilCosdu\Slower\Http\Controllers;
 
 use HalilCosdu\Slower\Services\RecommendationService;
+use HalilCosdu\Slower\Services\SlowLogPruner;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -30,11 +31,17 @@ class DashboardController
             ->paginate(max(1, (int) config('slower.dashboard.per_page', 25)))
             ->withQueryString();
 
+        // count/avg/max come from one aggregate query; the pending count stays
+        // separate because a conditional SUM would not be driver-portable.
+        $aggregate = $model::query()
+            ->selectRaw('count(*) as total, avg(time) as avg_time, max(time) as max_time')
+            ->first();
+
         $stats = [
-            'total' => $model::query()->count(),
+            'total' => (int) $aggregate->total,
             'pending' => $model::query()->where('is_analyzed', false)->count(),
-            'avg_time' => (float) $model::query()->avg('time'),
-            'max_time' => (float) $model::query()->max('time'),
+            'avg_time' => (float) $aggregate->avg_time,
+            'max_time' => (float) $aggregate->max_time,
         ];
 
         $connections = $model::query()
@@ -144,21 +151,14 @@ class DashboardController
         return redirect()->route('slower.index')->with('slower.status', sprintf('Query #%d deleted.', $record->getKey()));
     }
 
-    public function clean(Request $request): RedirectResponse
+    public function clean(Request $request, SlowLogPruner $pruner): RedirectResponse
     {
         $validated = $request->validate([
             'days' => ['required', 'integer', 'min:0', 'max:3650'],
         ]);
 
         $days = (int) $validated['days'];
-        $model = config('slower.resources.model');
-        $cutoff = now()->subDays($days);
-
-        $deleted = $model::query()->where('created_at', '<', $cutoff)->count();
-
-        $model::query()
-            ->where('created_at', '<', $cutoff)
-            ->chunkById(1000, fn ($logs) => $logs->each->delete());
+        $deleted = $pruner->olderThan($days);
 
         $message = $days === 0
             ? sprintf('Deleted all %d captured queries.', $deleted)

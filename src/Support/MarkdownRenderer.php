@@ -159,7 +159,6 @@ class MarkdownRenderer
             // List items and closing tags attach directly to their list; every
             // other block starts on its own line.
             $joined .= str_starts_with($block, '<li>') || str_starts_with($block, '</')
-                || str_ends_with($joined, '<ul>') || str_ends_with($joined, '<ol>')
                 ? $block
                 : "\n".$block;
         }

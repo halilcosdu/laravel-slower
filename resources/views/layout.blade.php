@@ -23,66 +23,33 @@
             --font-sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
-            --bg: #f2f4f8;
-            --surface: #ffffff;
-            --surface-2: #eaedf3;
-            --border: #d9dee8;
-            --text: #16203a;
-            --muted: #5d6880;
-            --accent: #9a5b00;
-            --accent-strong: #7c4a00;
-            --bar-from: #e8a33d;
-            --bar-to: #c97f16;
-            --ok: #0c7d56;
-            --ok-bg: rgba(14, 138, 95, 0.1);
-            --warn-bg: rgba(232, 163, 61, 0.14);
-            --danger: #b13a30;
-            --danger-bg: rgba(194, 69, 58, 0.09);
-            --focus: #2e5aac;
-            --shadow: 0 1px 2px rgba(22, 32, 58, 0.05), 0 8px 24px -16px rgba(22, 32, 58, 0.25);
+            /* Each color is declared once via light-dark(); the active side is
+               chosen by `color-scheme` below (OS preference by default, or the
+               manual data-theme override). */
+            color-scheme: light dark;
+            --bg: light-dark(#f2f4f8, #0b0e15);
+            --surface: light-dark(#ffffff, #121724);
+            --surface-2: light-dark(#eaedf3, #0e131e);
+            --border: light-dark(#d9dee8, #242d41);
+            --text: light-dark(#16203a, #e7ebf4);
+            --muted: light-dark(#5d6880, #94a0b8);
+            --accent: light-dark(#9a5b00, #f0b454);
+            --accent-strong: light-dark(#7c4a00, #f6c979);
+            --bar-from: light-dark(#e8a33d, #f0b454);
+            --bar-to: light-dark(#c97f16, #b97a1a);
+            --ok: light-dark(#0c7d56, #4cc38a);
+            --ok-bg: light-dark(rgba(14, 138, 95, 0.1), rgba(76, 195, 138, 0.12));
+            --warn-bg: light-dark(rgba(232, 163, 61, 0.14), rgba(240, 180, 84, 0.12));
+            --danger: light-dark(#b13a30, #f07c72);
+            --danger-bg: light-dark(rgba(194, 69, 58, 0.09), rgba(240, 124, 114, 0.12));
+            --focus: light-dark(#2e5aac, #8ab4ff);
+            /* Shadows are visible on light and effectively absent (transparent) on dark. */
+            --shadow: 0 1px 2px light-dark(rgba(22, 32, 58, 0.05), transparent),
+                0 8px 24px -16px light-dark(rgba(22, 32, 58, 0.25), transparent);
         }
 
-        [data-theme="dark"] {
-            --bg: #0b0e15;
-            --surface: #121724;
-            --surface-2: #0e131e;
-            --border: #242d41;
-            --text: #e7ebf4;
-            --muted: #94a0b8;
-            --accent: #f0b454;
-            --accent-strong: #f6c979;
-            --bar-from: #f0b454;
-            --bar-to: #b97a1a;
-            --ok: #4cc38a;
-            --ok-bg: rgba(76, 195, 138, 0.12);
-            --warn-bg: rgba(240, 180, 84, 0.12);
-            --danger: #f07c72;
-            --danger-bg: rgba(240, 124, 114, 0.12);
-            --focus: #8ab4ff;
-            --shadow: none;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            :root:not([data-theme="light"]) {
-                --bg: #0b0e15;
-                --surface: #121724;
-                --surface-2: #0e131e;
-                --border: #242d41;
-                --text: #e7ebf4;
-                --muted: #94a0b8;
-                --accent: #f0b454;
-                --accent-strong: #f6c979;
-                --bar-from: #f0b454;
-                --bar-to: #b97a1a;
-                --ok: #4cc38a;
-                --ok-bg: rgba(76, 195, 138, 0.12);
-                --warn-bg: rgba(240, 180, 84, 0.12);
-                --danger: #f07c72;
-                --danger-bg: rgba(240, 124, 114, 0.12);
-                --focus: #8ab4ff;
-                --shadow: none;
-            }
-        }
+        :root[data-theme="light"] { color-scheme: light; }
+        :root[data-theme="dark"] { color-scheme: dark; }
 
         *, *::before, *::after { box-sizing: border-box; }
 

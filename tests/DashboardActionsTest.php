@@ -138,6 +138,22 @@ describe('analyze one', function () {
             ->assertSessionHas('slower.error');
     });
 
+    it('flashes an error and stays retryable when the record connection cannot be resolved', function () {
+        $ai = Mockery::mock(AiServiceDriver::class);
+        $ai->shouldReceive('analyze')->never();
+        app()->instance(AiServiceDriver::class, $ai);
+
+        // A connection that is no longer configured makes schema extraction
+        // throw; the dashboard must surface it without finalizing the record.
+        $record = SlowLog::factory()->create(['connection_name' => 'does-not-exist']);
+
+        $this->post(route('slower.analyze', $record))
+            ->assertRedirect()
+            ->assertSessionHas('slower.error');
+
+        expect($record->refresh()->is_analyzed)->toBeFalse();
+    });
+
     it('returns 404 when analyzing an unknown record', function () {
         fakeAi();
 
