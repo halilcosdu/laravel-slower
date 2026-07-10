@@ -6,9 +6,12 @@ use HalilCosdu\Slower\AiServiceDrivers\AiServiceManager;
 use HalilCosdu\Slower\AiServiceDrivers\Contracts\AiServiceDriver;
 use HalilCosdu\Slower\Commands\AnalyzeQuery;
 use HalilCosdu\Slower\Commands\SlowLogCleaner;
+use HalilCosdu\Slower\Http\Middleware\Authorize;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -25,8 +28,36 @@ class SlowerServiceProvider extends PackageServiceProvider
         $package
             ->name('laravel-slower')
             ->hasConfigFile()
+            ->hasViews()
             ->hasMigration('create_slower_table')
             ->hasCommands(SlowLogCleaner::class, AnalyzeQuery::class);
+    }
+
+    public function packageBooted(): void
+    {
+        $this->registerDashboardGate();
+        $this->registerDashboardRoutes();
+    }
+
+    private function registerDashboardGate(): void
+    {
+        if (! Gate::has('viewSlower')) {
+            Gate::define('viewSlower', fn ($user = null) => app()->environment('local'));
+        }
+    }
+
+    private function registerDashboardRoutes(): void
+    {
+        if (! config('slower.dashboard.enabled', true)) {
+            return;
+        }
+
+        Route::group([
+            'domain' => config('slower.dashboard.domain'),
+            'prefix' => trim((string) config('slower.dashboard.path', 'slower'), '/'),
+            'as' => 'slower.',
+            'middleware' => config('slower.dashboard.middleware', ['web', Authorize::class]),
+        ], fn () => $this->loadRoutesFrom(__DIR__.'/../routes/web.php'));
     }
 
     public function packageRegistered(): void

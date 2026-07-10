@@ -66,6 +66,22 @@ describe('RecommendationService::getRecommendation', function () {
         expect($record->fresh()->recommendation)->toBe('Add a composite index on (product_id, price).');
     });
 
+    it('still produces a recommendation when the record connection is unavailable', function () {
+        $ai = Mockery::mock(AiServiceDriver::class);
+        $ai->shouldReceive('analyze')->once()->andReturn('Advice without schema.');
+
+        $service = new RecommendationService($ai);
+        // "mysql" is configured in the skeleton but there is no server to
+        // connect to, so schema extraction must degrade gracefully.
+        $record = SlowLog::factory()->create([
+            'connection_name' => 'mysql',
+            'raw_sql' => 'select * from users where id = 1',
+        ]);
+
+        expect($service->getRecommendation($record))->toBe('Advice without schema.');
+        expect($record->fresh()->is_analyzed)->toBeTrue();
+    });
+
     it('runs a safe (non-executing) EXPLAIN against the sqlite driver without throwing', function () {
         $ai = Mockery::mock(AiServiceDriver::class);
         $ai->shouldReceive('analyze')->andReturn('recommendation');

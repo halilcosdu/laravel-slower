@@ -11,7 +11,15 @@ class RecommendationService
 
     public function getRecommendation($record): ?string
     {
-        $schema = $this->extractIndexesAndSchemaFromRecord($record);
+        // Schema context is a nice-to-have for the prompt: when the record's
+        // connection is unavailable (e.g. captured on a connection that no
+        // longer exists), the analysis still proceeds without it.
+        try {
+            $schema = $this->extractIndexesAndSchemaFromRecord($record);
+        } catch (\Throwable $e) {
+            report(new \RuntimeException('Slower could not extract the schema for the recommendation: '.$e->getMessage(), 0, $e));
+            $schema = [];
+        }
         $userMessage = 'The query execution took '.$record->time.' milliseconds.'.PHP_EOL.
             'Connection: '.$record->connection.PHP_EOL.
             'Connection Name: '.$record->connection_name.PHP_EOL.

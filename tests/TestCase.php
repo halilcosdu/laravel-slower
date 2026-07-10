@@ -27,6 +27,8 @@ class TestCase extends Orchestra
     public function getEnvironmentSetUp($app)
     {
         config()->set('database.default', 'testing');
+        // Locks and rate limiting need a lock-capable store without external setup.
+        config()->set('cache.default', 'array');
         // A fake key so the OpenAI driver can be resolved during tests without
         // making any real HTTP calls.
         config()->set('slower.open_ai.api_key', 'test-key');
