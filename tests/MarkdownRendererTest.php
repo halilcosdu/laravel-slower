@@ -90,6 +90,11 @@ MD;
             ->toContain('<li>Compare <em>numeric</em> columns without quotes</li>');
     });
 
+    it('is immune to literal placeholder control characters in the input', function () {
+        expect(MarkdownRenderer::render("\x1A0\x1A and `code`"))
+            ->toBe('<p>0 and <code>code</code></p>');
+    });
+
     it('returns an empty string for blank input', function () {
         expect(MarkdownRenderer::render("  \n\n  "))->toBe('');
     });

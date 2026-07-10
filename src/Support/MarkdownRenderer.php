@@ -127,7 +127,9 @@ class MarkdownRenderer
 
     private function inline(string $text): string
     {
-        $escaped = e($text);
+        // Strip the SUB sentinel we use as a placeholder delimiter below so a
+        // crafted string cannot collide with the code-span shielding.
+        $escaped = e(str_replace("\x1A", '', $text));
 
         // Shield inline code spans so emphasis transforms cannot reach into them.
         $codeSpans = [];
