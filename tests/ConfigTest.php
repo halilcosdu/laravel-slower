@@ -11,8 +11,8 @@ describe('Config', function () {
         expect(config('slower.ai_service'))->toBe('openai');
     });
 
-    it('has default recommendation_model value', function () {
-        expect(config('slower.recommendation_model'))->toBe('gpt-5.4-mini');
+    it('leaves recommendation_model null so each provider uses its own default', function () {
+        expect(config('slower.recommendation_model'))->toBeNull();
     });
 
     it('has default enabled value', function () {
@@ -40,8 +40,8 @@ describe('Config', function () {
         expect(config('slower.resources.model'))->toBe(SlowLog::class);
     });
 
-    it('has open_ai configuration keys', function () {
-        expect(config('slower.open_ai'))->toHaveKeys(['api_key', 'organization', 'request_timeout']);
+    it('no longer ships a provider credential block (delegated to Prism)', function () {
+        expect(config('slower.open_ai'))->toBeNull();
     });
 
     it('has prompt configuration', function () {

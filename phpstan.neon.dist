@@ -14,13 +14,4 @@ parameters:
         - config
     viewDirectories:
         - resources/views
-    ignoreErrors:
-        # The dashboard views are registered under the `slower::` namespace at
-        # runtime (hasViews()); larastan can't resolve namespaced package views
-        # statically. They exist in resources/views and are covered by the
-        # feature tests, so the view-string check is a false positive here.
-        -
-            identifier: argument.type
-            message: '#\$view of function view expects view-string\|null, string given#'
-            path: src/Http/Controllers/DashboardController.php
 

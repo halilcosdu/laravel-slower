@@ -85,23 +85,25 @@ beforeEach(function () {
     Gate::define('viewSlower', fn ($user = null) => true);
     // Simulate a slow-query-only install: package enabled, but no AI provider
     // configured. Resolving the OpenAI driver would throw here.
-    config(['slower.open_ai.api_key' => null]);
+    // No provider key configured — the AI layer must never be touched by the
+    // read-only/maintenance dashboard actions.
+    config(['prism.providers.openai.api_key' => null]);
 });
 
 describe('dashboard without a configured AI provider', function () {
-    it('renders the index without resolving the AI driver', function () {
+    it('renders the index without touching the AI driver', function () {
         SlowLog::factory()->count(2)->create();
 
         $this->get(route('slower.index'))->assertOk();
     });
 
-    it('renders a detail page without resolving the AI driver', function () {
+    it('renders a detail page without touching the AI driver', function () {
         $record = SlowLog::factory()->create();
 
         $this->get(route('slower.show', $record))->assertOk();
     });
 
-    it('deletes a record without resolving the AI driver', function () {
+    it('deletes a record without touching the AI driver', function () {
         $record = SlowLog::factory()->create();
 
         $this->delete(route('slower.destroy', $record))->assertRedirect();
@@ -109,28 +111,17 @@ describe('dashboard without a configured AI provider', function () {
         expect(SlowLog::find($record->id))->toBeNull();
     });
 
-    it('cleans records without resolving the AI driver', function () {
+    it('cleans records without touching the AI driver', function () {
         SlowLog::factory()->create(['created_at' => now()->subDays(30)]);
 
         $this->delete(route('slower.clean'), ['days' => 15])
             ->assertRedirect()
             ->assertSessionHas('slower.status');
     });
-
-    it('flashes an error instead of 500ing when analyze is triggered but the driver cannot resolve', function () {
-        $record = SlowLog::factory()->create();
-
-        $this->post(route('slower.analyze', $record))
-            ->assertRedirect()
-            ->assertSessionHas('slower.error');
-
-        expect($record->refresh()->is_analyzed)->toBeFalse();
-    });
 });
 
 describe('analyze when the cache store cannot lock', function () {
     it('flashes an error instead of 500ing', function () {
-        config(['slower.open_ai.api_key' => 'test-key']);
         $ai = Mockery::mock(AiServiceDriver::class);
         $ai->shouldReceive('analyze')->never();
         app()->instance(AiServiceDriver::class, $ai);
