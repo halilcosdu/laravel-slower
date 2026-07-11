@@ -2,6 +2,19 @@
 
 All notable changes to `laravel-slower` will be documented in this file.
 
+## v3.1.0 - 2026-07-11
+
+### Added
+- **All major LLM providers.** Slower now supports **OpenAI, Anthropic (Claude), Gemini, and custom/self-hosted LLMs** through [Prism](https://prismphp.com). Switch with one variable: `SLOWER_AI_SERVICE=openai|anthropic|gemini|ollama|…`. Any Prism provider works out of the box; a fully custom backend registers via `AiServiceManager::extend()`.
+- Sensible low-cost default model per provider (`gpt-5.4-mini`, `claude-haiku-4-5`, `gemini-2.5-flash`), overridable with `SLOWER_AI_RECOMMENDATION_MODEL`.
+
+### Changed
+- **Minimal config.** Provider credentials are delegated to Prism's `config/prism.php` (`OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY`); Slower's own `open_ai` config block is removed. `recommendation_model` now defaults to `null` (the provider's default). The `AiServiceDriver` contract and `AiServiceManager::extend()` are unchanged.
+- Replaced the `openai-php/laravel` dependency with `prism-php/prism`. The whole integration lives behind one `PrismDriver`, so the rest of the package is decoupled from the provider layer.
+
+### Upgrade
+Existing OpenAI users need **no changes** — Prism reads your `OPENAI_API_KEY`, and a boot-time bridge still honors a legacy `slower.open_ai.api_key`. To use Claude or Gemini: `composer update`, set `ANTHROPIC_API_KEY`/`GEMINI_API_KEY`, and set `SLOWER_AI_SERVICE`. If your old published config hardcodes `recommendation_model`, clear it (or set the new provider's model) before switching providers.
+
 ## v3.0.0 - 2026-07-11
 
 Platform modernization. No public API, config, or database changes — only the supported runtime and the development toolchain moved forward.
