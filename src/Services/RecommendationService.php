@@ -65,13 +65,20 @@ class RecommendationService
         $payload .= 'Schema: '.json_encode($schema, JSON_PRETTY_PRINT).PHP_EOL.
             'Sql: '.$record->sql.PHP_EOL;
 
-        if (config('slower.ai_payload.send_raw_sql', false)) {
-            $payload .= 'Raw Sql: '.$this->redactor()->redactRawSql((string) $record->raw_sql).PHP_EOL;
-        }
+        $sendRawSql = config('slower.ai_payload.send_raw_sql', false);
+        $sendBindings = config('slower.ai_payload.send_bindings', false);
 
-        if (config('slower.ai_payload.send_bindings', false)) {
-            $bindings = is_array($record->bindings) ? $record->bindings : [];
-            $payload .= 'Bindings: '.json_encode($this->redactor()->redactBindings($bindings)).PHP_EOL;
+        if ($sendRawSql || $sendBindings) {
+            $redactor = $this->redactor();
+
+            if ($sendRawSql) {
+                $payload .= 'Raw Sql: '.$redactor->redactRawSql((string) $record->raw_sql).PHP_EOL;
+            }
+
+            if ($sendBindings) {
+                $bindings = is_array($record->bindings) ? $record->bindings : [];
+                $payload .= 'Bindings: '.json_encode($redactor->redactBindings($bindings)).PHP_EOL;
+            }
         }
 
         return $payload;
@@ -158,7 +165,11 @@ class RecommendationService
 
         $schema = [];
 
-        $tables = $this->getTableNamesFromRawQuery($record->raw_sql);
+        // Extract table names from the PARAMETERIZED sql, never raw_sql: a
+        // literal value that happens to contain a keyword like "from" would
+        // otherwise be mistaken for a table name and leak into the schema
+        // payload (and into the schema-introspection queries) as a secret.
+        $tables = $this->getTableNames($record->sql);
         foreach ($tables as $tableName) {
             $columns = $schemaBuilder->getColumnListing($tableName);
             $schema[$tableName]['indexes'] = $schemaBuilder->getIndexes($tableName);
@@ -171,7 +182,7 @@ class RecommendationService
         return $schema;
     }
 
-    private function getTableNamesFromRawQuery(string $sqlQuery): array
+    private function getTableNames(string $sqlQuery): array
     {
         // Regular expression to match table names
         $pattern = '/(?:FROM|JOIN|INTO|UPDATE)\s+(\S+)(?:\s+(?:AS\s+)?\w+)?(?:\s+ON\s+[^ ]+)?/i';

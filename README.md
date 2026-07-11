@@ -260,8 +260,8 @@ SLOWER_ANALYZE_QUEUE=default   # any queue name; unset = synchronous
 - Jobs are **unique per record** — double-clicks and overlapping scheduler runs can't queue duplicate (billable) analyses.
 - Failures follow your queue's retry semantics, and a record is only marked analyzed when a recommendation was actually stored.
 
-```php
-// A worker for that queue, and you're done:
+```bash
+# A worker for that queue, and you're done:
 php artisan queue:work --queue=default
 ```
 

@@ -89,7 +89,7 @@ class DashboardController
     {
         $groups = $this->filteredQuery($model, $filters)
             ->whereNotNull('fingerprint')
-            ->selectRaw('fingerprint, connection_name, count(*) as occurrences, avg(time) as avg_time, max(time) as max_time, min(created_at) as first_seen_at, max(created_at) as last_seen_at, max(id) as latest_id')
+            ->selectRaw('fingerprint, connection_name, count(*) as occurrences, avg(time) as avg_time, max(time) as max_time, max(created_at) as last_seen_at, max(id) as latest_id')
             ->groupBy('fingerprint', 'connection_name')
             ->tap(function (Builder $query) use ($filters) {
                 match ($filters['sort']) {
@@ -142,9 +142,16 @@ class DashboardController
         }
 
         // Queue mode: hand the work to a background job (unique per record,
-        // so double-clicks never queue twice) and return immediately.
+        // so double-clicks never queue twice) and return immediately. A dead
+        // queue connection surfaces as a flash message, not a 500.
         if ($queue = $this->analyzeQueue()) {
-            AnalyzeSlowLog::dispatch($record)->onQueue($queue);
+            try {
+                AnalyzeSlowLog::dispatch($record)->onQueue($queue);
+            } catch (\Throwable $e) {
+                report($e);
+
+                return back()->with('slower.error', 'Could not queue the analysis. Check your queue connection and try again.');
+            }
 
             return back()->with('slower.status', 'Analysis queued — the recommendation will appear once the job has run.');
         }
@@ -196,9 +203,15 @@ class DashboardController
         if ($queue = $this->analyzeQueue()) {
             $queued = 0;
 
-            foreach ($this->pendingRecords($model) as $record) {
-                AnalyzeSlowLog::dispatch($record)->onQueue($queue);
-                $queued++;
+            try {
+                foreach ($this->pendingRecords($model) as $record) {
+                    AnalyzeSlowLog::dispatch($record)->onQueue($queue);
+                    $queued++;
+                }
+            } catch (\Throwable $e) {
+                report($e);
+
+                return back()->with('slower.error', 'Could not queue the analysis. Check your queue connection and try again.');
             }
 
             return redirect()->route('slower.index')->with('slower.status',

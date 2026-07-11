@@ -73,6 +73,20 @@ describe('safe defaults', function () {
             ->toContain('OrderController@index');
     });
 
+    it('does not leak inlined raw-SQL literals through schema extraction', function () {
+        // The table-name extraction must run over the parameterized SQL. If it
+        // ran over raw_sql, a literal containing a keyword like "from" would be
+        // mistaken for a table name and json_encoded into the schema payload,
+        // leaking the secret that follows it.
+        $payload = analyzeAndCapturePayload(SlowLog::factory()->create([
+            'sql' => 'select * from audit_events where note = ?',
+            'raw_sql' => "select * from audit_events where note = 'imported from sk-CANARY-TOKEN'",
+            'bindings' => ['imported from sk-CANARY-TOKEN'],
+        ]));
+
+        expect($payload)->not->toContain('sk-CANARY-TOKEN');
+    });
+
     it('never forwards the captured user id to the AI provider', function () {
         // user_id is an opt-in for the dashboard; the LLM gains nothing from
         // it, so it must be stripped from the payload's origin line.

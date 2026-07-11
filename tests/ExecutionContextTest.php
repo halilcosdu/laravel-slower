@@ -68,6 +68,25 @@ describe('origin resolution', function () {
         expect($context->origin()['type'])->toBe('console');
     });
 
+    it('restores the outer job context after a nested job finishes', function () {
+        $context = app(ExecutionContext::class);
+        $context->startJob('App\\Jobs\\Outer');
+        $context->startJob('App\\Jobs\\Inner'); // dispatchSync inside Outer
+        $context->endJob();
+
+        // Back inside Outer — not reset to http/console.
+        expect($context->origin())->toMatchArray(['type' => 'queue', 'job' => 'App\\Jobs\\Outer']);
+    });
+
+    it('restores the outer command context after a nested command finishes', function () {
+        $context = app(ExecutionContext::class);
+        $context->startCommand('app:outer');
+        $context->startCommand('app:inner'); // Artisan::call inside app:outer
+        $context->endCommand();
+
+        expect($context->origin())->toMatchArray(['type' => 'console', 'command' => 'app:outer']);
+    });
+
     it('records the first application code frame', function () {
         $origin = app(ExecutionContext::class)->origin();
 

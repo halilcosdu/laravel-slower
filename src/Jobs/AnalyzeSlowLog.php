@@ -30,6 +30,12 @@ class AnalyzeSlowLog implements ShouldBeUnique, ShouldQueue
     /** Seconds the uniqueness lock is held at most. */
     public int $uniqueFor = 600;
 
+    /**
+     * If the record was pruned (slower:clean, a dashboard delete) between
+     * dispatch and pickup, quietly drop the job instead of failing it.
+     */
+    public bool $deleteWhenMissingModels = true;
+
     public function __construct(public Model $record) {}
 
     public function uniqueId(): string
@@ -39,6 +45,12 @@ class AnalyzeSlowLog implements ShouldBeUnique, ShouldQueue
 
     public function handle(RecommendationService $service): void
     {
+        // Mirror the synchronous entry point (Slower::analyze): respect the
+        // kill switch even for jobs queued before it was turned off.
+        if (! config('slower.ai_recommendation')) {
+            return;
+        }
+
         $service->getRecommendation($this->record);
     }
 }

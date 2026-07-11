@@ -189,6 +189,10 @@ class SlowerServiceProvider extends PackageServiceProvider
         $bindings = $this->normalizeBindings($event->bindings);
         $fingerprinter = $this->app->make(SqlFingerprinter::class);
 
+        // Only storage sits in the try/catch: a failure here is a genuine
+        // storage problem (full disk, missing column) and should back off. The
+        // circuit breaker must NOT be armed by an application event listener
+        // that throws — the row is already stored by then.
         try {
             $record = $model::query()->create([
                 'bindings' => $bindings,
@@ -197,27 +201,10 @@ class SlowerServiceProvider extends PackageServiceProvider
                 'connection' => $event->connection::class,
                 'connection_name' => $event->connectionName,
                 'raw_sql' => $connection->getQueryGrammar()->substituteBindingsIntoRawSql($event->sql, $bindings),
-                'fingerprint' => $fingerprint = $fingerprinter->fingerprint($event->sql),
+                'fingerprint' => $fingerprinter->fingerprint($event->sql),
                 'fingerprint_version' => SqlFingerprinter::VERSION,
                 'origin' => $context->origin(),
             ]);
-
-            $context->recordCapture();
-
-            Event::dispatch(new SlowQueryCaptured($record));
-
-            // First-seen means "no earlier row carries this fingerprint".
-            // Comparing against earlier ids (instead of counting all rows) is
-            // race-safe: when two processes insert the same new shape
-            // concurrently, exactly one of them sees no predecessor.
-            $hasEarlier = $model::query()
-                ->where('fingerprint', $fingerprint)
-                ->where($record->getKeyName(), '<', $record->getKey())
-                ->exists();
-
-            if (! $hasEarlier) {
-                Event::dispatch(new SlowQueryFirstSeen($record));
-            }
         } catch (\Throwable $e) {
             // Logging slow queries must never break the application's own
             // request — and must not keep re-failing on every subsequent
@@ -225,6 +212,46 @@ class SlowerServiceProvider extends PackageServiceProvider
             // surfaced without the raw SQL (it may contain sensitive data).
             $context->suspendFor(self::CAPTURE_SUSPEND_SECONDS);
             report(new \RuntimeException('Failed to store slow query log: '.$e->getMessage(), 0, $e));
+
+            return;
+        }
+
+        $context->recordCapture();
+
+        // Event delivery is isolated: a throwing application listener (a Slack
+        // notifier during an outage, say) is reported but never bubbles into
+        // the app's query path nor arms the storage circuit breaker — the row
+        // was stored fine.
+        try {
+            Event::dispatch(new SlowQueryCaptured($record));
+            $this->dispatchFirstSeen($model, $record);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    /**
+     * Fire SlowQueryFirstSeen the first time a (fingerprint, connection) pair
+     * appears — the same identity the grouped dashboard uses. "First" means no
+     * earlier row shares it: comparing against earlier ids (rather than a
+     * count) is race-safe, so exactly one of two concurrent inserts of a brand
+     * new shape sees no predecessor. The lookup is skipped entirely when
+     * nothing listens, keeping capture cheap for the default install.
+     */
+    private function dispatchFirstSeen(string $model, $record): void
+    {
+        if (! Event::hasListeners(SlowQueryFirstSeen::class)) {
+            return;
+        }
+
+        $hasEarlier = $model::query()
+            ->where('fingerprint', $record->fingerprint)
+            ->where('connection_name', $record->connection_name)
+            ->where($record->getKeyName(), '<', $record->getKey())
+            ->exists();
+
+        if (! $hasEarlier) {
+            Event::dispatch(new SlowQueryFirstSeen($record));
         }
     }
 

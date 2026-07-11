@@ -23,6 +23,22 @@ describe('the AnalyzeSlowLog job', function () {
             ->and($job->uniqueId())->toBe((string) $record->getKey());
     });
 
+    it('is discarded instead of failing when its record was pruned before pickup', function () {
+        // slower:clean (or a dashboard delete) can remove a record after the
+        // job is queued; the job must be dropped, not land in failed_jobs.
+        expect((new AnalyzeSlowLog(SlowLog::factory()->create()))->deleteWhenMissingModels)->toBeTrue();
+    });
+
+    it('does not call the AI driver when recommendations are disabled', function () {
+        config(['slower.ai_recommendation' => false]);
+
+        $driver = Mockery::mock(AiServiceDriver::class);
+        $driver->shouldReceive('analyze')->never();
+        app()->instance(AiServiceDriver::class, $driver);
+
+        (new AnalyzeSlowLog(SlowLog::factory()->create()))->handle(app(RecommendationService::class));
+    });
+
     it('analyzes the record when handled', function () {
         $driver = Mockery::mock(AiServiceDriver::class);
         $driver->shouldReceive('analyze')->once()->andReturn('Add an index.');

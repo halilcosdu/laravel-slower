@@ -28,16 +28,22 @@ class SqlFingerprinter
 
     public function normalize(string $sql): string
     {
-        // 1. String literals first (their content must never influence later
-        //    passes). Handles '' and \' escapes. Double-quoted and backtick
-        //    tokens are identifiers on pgsql/sqlite/mysql and are left alone.
-        $sql = (string) preg_replace("/'(?:[^'\\\\]|\\\\.|'')*'/s", '?', $sql);
+        // 1. Strip string literals AND comments in a single left-to-right pass.
+        //    Whichever token opens first at a given position wins — exactly how
+        //    a SQL lexer scans — so a quote inside a comment can't start a
+        //    bogus string, and a `--`/`/*` inside a string isn't a comment.
+        //    String literals use standard `''` doubling (correct for
+        //    pgsql/sqlite and MySQL in ANSI mode); a trailing backslash is an
+        //    ordinary character, so the closing quote always terminates the
+        //    literal instead of over-running into the following SQL.
+        //    Double-quoted / backtick tokens are identifiers and are left alone.
+        $sql = (string) preg_replace_callback(
+            "~'(?:[^']|'')*'|--[^\n]*|/\\*.*?\\*/~s",
+            static fn (array $m): string => $m[0][0] === "'" ? '?' : ' ',
+            $sql
+        );
 
-        // 2. Comments: /* ... */ blocks and -- to end of line.
-        $sql = (string) preg_replace('~/\*.*?\*/~s', ' ', $sql);
-        $sql = (string) preg_replace('/--[^\n]*/', ' ', $sql);
-
-        // 3. Named placeholders (:id) become positional. The lookbehind keeps
+        // 2. Named placeholders (:id) become positional. The lookbehind keeps
         //    pgsql casts (::text) intact.
         $sql = (string) preg_replace('/(?<!:):\w+/', '?', $sql);
 

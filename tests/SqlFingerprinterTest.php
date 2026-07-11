@@ -61,7 +61,40 @@ describe('SqlFingerprinter', function () {
             "select * from users where id = ? -- lookup\n",
             'select * from users where id = ?',
         ],
+        'apostrophe inside a line comment does not corrupt the scan' => [
+            "select * from orders -- customer's\nwhere region = 'eu'",
+            "select * from orders where region = 'eu'",
+        ],
+        'apostrophe inside a block comment does not corrupt the scan' => [
+            "select /* john's tenant */ id from orders where region = 'eu'",
+            "select id from orders where region = 'eu'",
+        ],
     ]);
+
+    it('does not merge distinct queries via an apostrophe in a comment', function () {
+        // The apostrophe in the comment must not open a string that runs to the
+        // next real quote and swallows the differing WHERE column.
+        expect($this->fingerprinter->fingerprint("select * from orders -- customer's\nwhere region = 'eu'"))
+            ->not->toBe($this->fingerprinter->fingerprint("select * from orders -- customer's\nwhere status = 'open'"));
+    });
+
+    it('does not let a comment marker inside a string literal start a comment', function () {
+        // The "--" and "/*" live inside a string; they must not be treated as
+        // comment starts (the string alternative wins because it opens first).
+        expect($this->fingerprinter->normalize("select * from t where note = 'a -- b' and x = 1"))
+            ->toBe($this->fingerprinter->normalize("select * from t where note = 'c -- d' and x = 2"))
+            ->and($this->fingerprinter->normalize("select * from t where note = 'a -- b' and x = 1"))
+            ->not->toBe($this->fingerprinter->normalize('select * from t where y = 1'));
+    });
+
+    it('keeps distinct queries apart when an inlined literal ends in a backslash (pgsql/sqlite)', function () {
+        // On standard-conforming drivers a trailing backslash is an ordinary
+        // char, so the closing quote terminates the literal; a MySQL-style
+        // backslash-escape reading would swallow ` and owner = ` into the
+        // literal and merge these two distinct statements.
+        expect($this->fingerprinter->fingerprint("select * from files where dir = 'C:\\' and owner = 'bob'"))
+            ->not->toBe($this->fingerprinter->fingerprint("select * from files where dir = 'C:\\' and group_name = 'bob'"));
+    });
 
     it('collapses IN lists of any size', function (string $a, string $b) {
         expect($this->fingerprinter->fingerprint($a))->toBe($this->fingerprinter->fingerprint($b));

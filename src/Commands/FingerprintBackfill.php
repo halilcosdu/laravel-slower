@@ -27,6 +27,9 @@ class FingerprintBackfill extends Command
                 $query->whereNull('fingerprint')
                     ->orWhere('fingerprint_version', '<', SqlFingerprinter::VERSION);
             })
+            // Only the key and the parameterized sql are read — skip the
+            // longtext raw_sql/bindings/recommendation columns.
+            ->select((new $model)->getKeyName(), 'sql')
             ->chunkById(1000, function ($records) use ($fingerprinter, &$updated) {
                 foreach ($records as $record) {
                     $record->update([

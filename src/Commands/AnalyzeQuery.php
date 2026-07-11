@@ -61,8 +61,11 @@ class AnalyzeQuery extends Command
         $queue = config('slower.analyze_queue');
         $queued = 0;
 
+        // Only the key is needed: SerializesModels reduces the job to class+id
+        // anyway, so avoid hydrating longtext columns for every pending record.
         $model::query()
             ->where('is_analyzed', false)
+            ->select((new $model)->getKeyName())
             ->chunkById(1000, function ($records) use ($queue, &$queued) {
                 foreach ($records as $record) {
                     $job = AnalyzeSlowLog::dispatch($record);

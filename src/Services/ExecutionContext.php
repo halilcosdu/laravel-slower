@@ -18,9 +18,11 @@ class ExecutionContext
 {
     private int $captures = 0;
 
-    private ?string $jobClass = null;
+    /** @var list<string> LIFO stack of running job classes (nested dispatchSync). */
+    private array $jobs = [];
 
-    private ?string $commandName = null;
+    /** @var list<string> LIFO stack of running artisan commands (nested Artisan::call). */
+    private array $commands = [];
 
     private float $suspendedUntil = 0.0;
 
@@ -31,24 +33,27 @@ class ExecutionContext
 
     public function startJob(string $jobClass): void
     {
-        $this->jobClass = $jobClass;
+        $this->jobs[] = $jobClass;
         $this->captures = 0;
     }
 
     public function endJob(): void
     {
-        $this->jobClass = null;
+        array_pop($this->jobs);
     }
 
     public function startCommand(?string $commandName): void
     {
-        $this->commandName = $commandName;
+        // A null command name (some framework internals) shouldn't push a frame.
+        if ($commandName !== null) {
+            $this->commands[] = $commandName;
+        }
         $this->captures = 0;
     }
 
     public function endCommand(): void
     {
-        $this->commandName = null;
+        array_pop($this->commands);
     }
 
     public function recordCapture(): void
@@ -85,8 +90,8 @@ class ExecutionContext
         }
 
         $origin = match (true) {
-            $this->jobClass !== null => ['type' => 'queue', 'job' => $this->jobClass],
-            $this->commandName !== null => ['type' => 'console', 'command' => $this->commandName],
+            $this->jobs !== [] => ['type' => 'queue', 'job' => end($this->jobs)],
+            $this->commands !== [] => ['type' => 'console', 'command' => end($this->commands)],
             Route::current() !== null => [
                 'type' => 'http',
                 'route' => Route::currentRouteName(),

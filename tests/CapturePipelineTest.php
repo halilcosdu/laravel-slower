@@ -78,12 +78,45 @@ describe('capture events', function () {
         // e.g. a row backfilled by slower:fingerprint, or captured by another process.
         SlowLog::factory()->create([
             'fingerprint' => (new SqlFingerprinter)->fingerprint('select 1 as probe'),
+            'connection_name' => 'testing',
         ]);
 
         DB::select('select 1 as probe');
 
         Event::assertDispatched(SlowQueryCaptured::class);
         Event::assertNotDispatched(SlowQueryFirstSeen::class);
+    });
+
+    it('treats a known shape on a new connection as first-seen (matches grouped view scoping)', function () {
+        Event::fake([SlowQueryFirstSeen::class]);
+
+        // Same shape already seen, but on a different connection.
+        SlowLog::factory()->create([
+            'fingerprint' => (new SqlFingerprinter)->fingerprint('select 1 as probe'),
+            'connection_name' => 'other-connection',
+        ]);
+
+        DB::select('select 1 as probe'); // captured on the 'testing' connection
+
+        Event::assertDispatched(SlowQueryFirstSeen::class);
+    });
+
+    it('keeps the row and still fires events when a synchronous listener throws', function () {
+        // A user listener (e.g. a Slack notifier) throwing must NOT be mistaken
+        // for a storage failure: the row is already stored, so the circuit
+        // breaker must stay closed and capture must keep working.
+        Event::listen(SlowQueryCaptured::class, function () {
+            throw new RuntimeException('slack webhook down');
+        });
+
+        DB::select('select 1 as probe');
+
+        expect(SlowLog::query()->count())->toBe(1)
+            ->and(app(ExecutionContext::class)->isSuspended())->toBeFalse();
+
+        // A second capture still lands (breaker never opened).
+        DB::select('select 2 as other');
+        expect(SlowLog::query()->count())->toBe(2);
     });
 });
 
