@@ -2,10 +2,12 @@
 
 namespace HalilCosdu\Slower\Http\Controllers;
 
+use HalilCosdu\Slower\Jobs\AnalyzeSlowLog;
 use HalilCosdu\Slower\Services\RecommendationService;
 use HalilCosdu\Slower\Services\SlowLogPruner;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,6 +25,7 @@ class DashboardController
     public function index(Request $request): View
     {
         $model = config('slower.resources.model');
+        $view = $request->query('view') === 'grouped' ? 'grouped' : 'events';
 
         // Every filter is sanitized to a scalar here (array-valued query params
         // are coerced away) so both the query and the view stay crash-safe.
@@ -30,18 +33,10 @@ class DashboardController
             'search' => $this->stringParam($request, 'search'),
             'status' => in_array($request->query('status'), ['pending', 'analyzed'], true) ? $request->query('status') : '',
             'connection' => $this->stringParam($request, 'connection'),
-            'sort' => in_array($request->query('sort'), ['time', 'date'], true) ? $request->query('sort') : '',
+            'fingerprint' => $this->stringParam($request, 'fingerprint'),
+            'sort' => in_array($request->query('sort'), ['time', 'date', 'count'], true) ? $request->query('sort') : '',
             'direction' => $request->query('direction') === 'asc' ? 'asc' : 'desc',
         ];
-
-        $records = $model::query()
-            ->when($filters['search'] !== '', fn (Builder $query) => $this->applySearch($query, $filters['search']))
-            ->when($filters['status'] === 'pending', fn (Builder $query) => $query->where('is_analyzed', false))
-            ->when($filters['status'] === 'analyzed', fn (Builder $query) => $query->where('is_analyzed', true))
-            ->when($filters['connection'] !== '', fn (Builder $query) => $query->where('connection_name', $filters['connection']))
-            ->tap(fn (Builder $query) => $this->applySort($query, $filters))
-            ->paginate(max(1, (int) config('slower.dashboard.per_page', 25)))
-            ->withQueryString();
 
         // count/avg/max come from one aggregate query; the pending count stays
         // separate because a conditional SUM would not be driver-portable.
@@ -62,12 +57,71 @@ class DashboardController
             ->orderBy('connection_name')
             ->pluck('connection_name');
 
-        return view('slower::index', [
-            'records' => $records,
+        $data = [
+            'view' => $view,
             'stats' => $stats,
             'connections' => $connections,
             'filters' => $filters,
-        ]);
+        ];
+
+        if ($view === 'grouped') {
+            return view('slower::index', $data + $this->groupedData($model, $filters));
+        }
+
+        $records = $this->filteredQuery($model, $filters)
+            ->when($filters['fingerprint'] !== '', fn (Builder $query) => $query->where('fingerprint', $filters['fingerprint']))
+            ->tap(fn (Builder $query) => $this->applySort($query, $filters))
+            ->paginate(max(1, (int) config('slower.dashboard.per_page', 25)))
+            ->withQueryString();
+
+        return view('slower::index', $data + ['records' => $records]);
+    }
+
+    /**
+     * One row per query shape (fingerprint) and connection. Aggregates are
+     * computed over the *filtered* events, and each group carries its latest
+     * event id so a representative SQL can be fetched in a single query —
+     * portable across sqlite/mysql/pgsql (no window functions).
+     *
+     * @return array<string, mixed>
+     */
+    private function groupedData(string $model, array $filters): array
+    {
+        $groups = $this->filteredQuery($model, $filters)
+            ->whereNotNull('fingerprint')
+            ->selectRaw('fingerprint, connection_name, count(*) as occurrences, avg(time) as avg_time, max(time) as max_time, min(created_at) as first_seen_at, max(created_at) as last_seen_at, max(id) as latest_id')
+            ->groupBy('fingerprint', 'connection_name')
+            ->tap(function (Builder $query) use ($filters) {
+                match ($filters['sort']) {
+                    'time' => $query->orderBy('max_time', $filters['direction']),
+                    'date' => $query->orderBy('last_seen_at', $filters['direction']),
+                    'count' => $query->orderBy('occurrences', $filters['direction']),
+                    default => $query->orderByDesc('occurrences'),
+                };
+                $query->orderBy('fingerprint');
+            })
+            ->paginate(max(1, (int) config('slower.dashboard.per_page', 25)))
+            ->withQueryString();
+
+        $representatives = $model::query()
+            ->findMany($groups->getCollection()->pluck('latest_id'))
+            ->keyBy('id');
+
+        return [
+            'groups' => $groups,
+            'representatives' => $representatives,
+            'unfingerprinted' => $model::query()->whereNull('fingerprint')->count(),
+        ];
+    }
+
+    /** The filters shared by the events and grouped views. */
+    private function filteredQuery(string $model, array $filters): Builder
+    {
+        return $model::query()
+            ->when($filters['search'] !== '', fn (Builder $query) => $this->applySearch($query, $filters['search']))
+            ->when($filters['status'] === 'pending', fn (Builder $query) => $query->where('is_analyzed', false))
+            ->when($filters['status'] === 'analyzed', fn (Builder $query) => $query->where('is_analyzed', true))
+            ->when($filters['connection'] !== '', fn (Builder $query) => $query->where('connection_name', $filters['connection']));
     }
 
     public function show(int $log): View
@@ -85,6 +139,14 @@ class DashboardController
 
         if ($limited = $this->rateLimitAnalysis($request)) {
             return $limited;
+        }
+
+        // Queue mode: hand the work to a background job (unique per record,
+        // so double-clicks never queue twice) and return immediately.
+        if ($queue = $this->analyzeQueue()) {
+            AnalyzeSlowLog::dispatch($record)->onQueue($queue);
+
+            return back()->with('slower.status', 'Analysis queued — the recommendation will appear once the job has run.');
         }
 
         // Lock acquisition and driver resolution are inside the try/catch so a
@@ -131,6 +193,18 @@ class DashboardController
             return redirect()->route('slower.index')->with('slower.status', 'Nothing to analyze — there are no pending queries.');
         }
 
+        if ($queue = $this->analyzeQueue()) {
+            $queued = 0;
+
+            foreach ($this->pendingRecords($model) as $record) {
+                AnalyzeSlowLog::dispatch($record)->onQueue($queue);
+                $queued++;
+            }
+
+            return redirect()->route('slower.index')->with('slower.status',
+                sprintf('%d %s queued for analysis — recommendations will appear once the jobs have run.', $queued, $queued === 1 ? 'query' : 'queries'));
+        }
+
         try {
             $service = app(RecommendationService::class);
         } catch (\Throwable $e) {
@@ -139,11 +213,10 @@ class DashboardController
             return back()->with('slower.error', 'The AI service is not available. Check your configuration and try again.');
         }
 
-        $limit = max(1, (int) config('slower.dashboard.analyze_pending_limit', 10));
         $analyzed = 0;
         $failed = 0;
 
-        foreach ($model::query()->where('is_analyzed', false)->orderBy('id')->limit($limit)->get() as $record) {
+        foreach ($this->pendingRecords($model) as $record) {
             try {
                 $recommendation = $service->getRecommendation($record);
             } catch (\Throwable $e) {
@@ -206,6 +279,24 @@ class DashboardController
         $model = config('slower.resources.model');
 
         return $model::query()->findOrFail($id);
+    }
+
+    /** The queue name analysis jobs should go to, or null for synchronous mode. */
+    private function analyzeQueue(): ?string
+    {
+        $queue = config('slower.analyze_queue');
+
+        return is_string($queue) && $queue !== '' ? $queue : null;
+    }
+
+    /**
+     * @return Collection<int, Model>
+     */
+    private function pendingRecords(string $model)
+    {
+        $limit = max(1, (int) config('slower.dashboard.analyze_pending_limit', 10));
+
+        return $model::query()->where('is_analyzed', false)->orderBy('id')->limit($limit)->get();
     }
 
     private function stringParam(Request $request, string $key): string

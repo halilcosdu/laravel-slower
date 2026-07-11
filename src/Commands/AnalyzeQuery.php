@@ -2,13 +2,14 @@
 
 namespace HalilCosdu\Slower\Commands;
 
+use HalilCosdu\Slower\Jobs\AnalyzeSlowLog;
 use HalilCosdu\Slower\Services\RecommendationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
 class AnalyzeQuery extends Command
 {
-    public $signature = 'slower:analyze';
+    public $signature = 'slower:analyze {--queue : Dispatch analysis jobs instead of analyzing inline}';
 
     public $description = 'Analyze and generate a recommendation for the given record.';
 
@@ -20,6 +21,10 @@ class AnalyzeQuery extends Command
             return self::SUCCESS;
         }
         $model = config('slower.resources.model');
+
+        if ($this->option('queue')) {
+            return $this->dispatchToQueue($model);
+        }
 
         $analyzed = 0;
         $skipped = 0;
@@ -43,6 +48,34 @@ class AnalyzeQuery extends Command
 
         $this->line('------------------------------------');
         $this->comment('Analyzed: '.$analyzed.' | Skipped (no recommendation, will retry on the next run): '.$skipped);
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Queue one unique job per pending record. `slower.analyze_queue` names
+     * the queue; without it, jobs go to the connection's default queue.
+     */
+    private function dispatchToQueue(string $model): int
+    {
+        $queue = config('slower.analyze_queue');
+        $queued = 0;
+
+        $model::query()
+            ->where('is_analyzed', false)
+            ->chunkById(1000, function ($records) use ($queue, &$queued) {
+                foreach ($records as $record) {
+                    $job = AnalyzeSlowLog::dispatch($record);
+
+                    if (is_string($queue) && $queue !== '') {
+                        $job->onQueue($queue);
+                    }
+
+                    $queued++;
+                }
+            });
+
+        $this->comment('Queued: '.$queued.' | Run a queue worker to process the analysis jobs.');
 
         return self::SUCCESS;
     }

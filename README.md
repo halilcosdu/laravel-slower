@@ -28,6 +28,12 @@ Laravel Slower watches every query your application runs, captures the ones that
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [The Dashboard](#the-dashboard)
+- [Query groups](#query-groups)
+- [Origin context](#origin-context)
+- [Production controls](#production-controls)
+- [Privacy: what reaches your AI provider](#privacy-what-reaches-your-ai-provider)
+- [Queued analysis](#queued-analysis)
+- [Events](#events)
 - [Configuration](#configuration)
 - [AI providers](#ai-providers)
 - [Commands and scheduling](#commands-and-scheduling)
@@ -37,11 +43,17 @@ Laravel Slower watches every query your application runs, captures the ones that
 ## Features
 
 - 🚨 **Automatic capture** — a `DB::listen` hook logs every query slower than your threshold, with bindings and resolved SQL.
-- 🤖 **AI recommendations** — sends the query, schema, indexes and a safe `EXPLAIN` plan to your LLM of choice (OpenAI, Anthropic, Gemini, or a custom driver) and stores actionable optimization advice.
+- 🧬 **Query groups** — every capture gets a fingerprint, so 10,000 repeats of the same statement read as *one problem with a counter*, not ten thousand rows.
+- 📍 **Origin context** — each capture records where it came from: the route and controller action, queue job, or artisan command, down to the `file:line` of your code that triggered it.
+- 🤖 **AI recommendations** — sends the query shape, schema, indexes, origin and a safe `EXPLAIN` plan to your LLM of choice (OpenAI, Anthropic, Gemini, or a custom driver) and stores actionable optimization advice.
+- 🔒 **Privacy-first AI payload** — by default only the *parameterized* SQL leaves your app: no binding values, no literals. Raw SQL and bindings are explicit opt-ins with a redactor hook.
 - 🧩 **Any major LLM, one variable** — switch providers with `SLOWER_AI_SERVICE`; credentials live in Prism's config, not Slower's. Bring your own model with a one-method driver.
-- 📊 **Built-in dashboard** — stats, search, filters, sorting, query detail with rendered recommendations, one-click *Analyze with AI*, cleanup tools. Dark and light theme, fully self-contained.
+- 📊 **Built-in dashboard** — stats, events & grouped views, search, filters, sorting, query detail with rendered recommendations, one-click *Analyze with AI*, cleanup tools. Dark and light theme, fully self-contained.
+- 🎚️ **Production controls** — sampling, a per-request capture cap, and a circuit breaker that backs off when storing logs fails. Safe to leave on under real traffic.
+- 🧵 **Queued analysis** — run AI analysis as unique background jobs (`SLOWER_ANALYZE_QUEUE`) so a 30-second LLM round-trip never blocks a request.
+- 📣 **Events, not lock-in** — `SlowQueryCaptured` and `SlowQueryFirstSeen` events let you wire alerts to Slack, mail or anything else in a few lines.
 - 🛡️ **Safe by default** — the dashboard is only accessible in the `local` environment until you explicitly open it, AI actions are rate-limited and capped, destructive actions ask first.
-- ⏰ **Scheduler-friendly commands** — `slower:analyze` and `slower:clean` for bulk analysis and retention.
+- ⏰ **Scheduler-friendly commands** — `slower:analyze`, `slower:clean` and `slower:fingerprint` for bulk analysis, retention and upgrades.
 
 ## How it works
 
@@ -49,8 +61,8 @@ Laravel Slower watches every query your application runs, captures the ones that
 every query → DB::listen (timed) → slower than threshold → slow_logs → AI analysis → recommendation → /slower
 ```
 
-1. **Capture.** A `DB::listen` hook times every query. Anything slower than `threshold` (ms) is written to the `slow_logs` table with its SQL, bindings and connection. Faster queries are ignored — nothing is stored.
-2. **Analyze.** `slower:analyze` (or the dashboard's *Analyze with AI* button) sends each unanalyzed query — plus its table schema, indexes and a safe, read-only `EXPLAIN` plan — to your configured LLM (OpenAI, Claude, Gemini or a custom driver).
+1. **Capture.** A `DB::listen` hook times every query. Anything slower than `threshold` (ms) is written to the `slow_logs` table with its SQL, bindings, connection, a **fingerprint** (so repeats group together) and its **origin** (route/job/command + code location). Faster queries are ignored — nothing is stored.
+2. **Analyze.** `slower:analyze` (or the dashboard's *Analyze with AI* button, or a queued job) sends each unanalyzed query — the parameterized SQL, table schema, indexes, origin and a safe, read-only `EXPLAIN` plan — to your configured LLM (OpenAI, Claude, Gemini or a custom driver).
 3. **Recommend.** The advice (indexes, rewrites, data-type fixes) is stored on the record and rendered as markdown in the dashboard, ready to act on.
 
 ## Requirements
@@ -86,8 +98,9 @@ To enable AI recommendations, [pick a provider](#ai-providers) and set its API k
 The dashboard lives at `/slower` and gives you:
 
 - **Overview stats** — captured count, pending analysis, average and max duration.
-- **The query list** — duration bars, search over the resolved SQL, status and connection filters, sortable columns, pagination.
-- **Query detail** — formatted SQL, parameterized statement, bindings, and the AI recommendation rendered from markdown.
+- **Two list modes** — *Events* (every capture) and *Grouped* (one row per query shape with an occurrence counter, avg/max duration and last-seen time). Click a group to drill into its events.
+- **Search and filters** — search over the resolved SQL, status and connection filters, sortable columns, pagination — in both modes.
+- **Query detail** — formatted SQL, parameterized statement, bindings, the origin (route/job/command and code location), and the AI recommendation rendered from markdown.
 - **Actions** — *Analyze with AI* per query (or up to `analyze_pending_limit` pending queries at once), delete, and *clean up older than N days* (`0` wipes everything). Every AI action warns that it may incur provider charges; every destructive action asks for confirmation.
 
 ### Authorizing access in production
@@ -123,6 +136,175 @@ Set `SLOWER_DASHBOARD_ENABLED=false` to remove the routes entirely, or change `p
 > [!WARNING]
 > Captured SQL and bindings can contain user data, tokens and other secrets, and analyzing a query sends it (with schema context) to your AI provider as a billable API call. Keep the gate tight, and prune regularly with `slower:clean`.
 
+## Query groups
+
+The same slow query rarely fires once. Every capture is fingerprinted — literals, whitespace, placeholder style and `IN (...)` list sizes are normalized away — so these three executions:
+
+```sql
+select * from orders where status = 'pending'  and created_at >= '2026-06-01'
+select * from orders where status = 'refunded' and created_at >= '2026-07-01'
+SELECT * FROM orders WHERE status = ? AND created_at >= ?
+```
+
+are **one group** in the dashboard's *Grouped* view, with an occurrence counter, average/max duration, and last-seen time — so you fix the most frequent offender first instead of scrolling through repeats. Groups are scoped per connection, and clicking one drills down to its individual events.
+
+<div align="center">
+<img src="art/grouped-dark.png" alt="The Grouped view: one row per query shape with an occurrence counter, max and average duration, and last-seen time" width="900">
+</div>
+
+Fingerprints are computed from the parameterized SQL (never from real values) and the algorithm is versioned. Upgrading from an earlier version? Fingerprint your existing records once:
+
+```bash
+php artisan slower:fingerprint   # chunked & idempotent — safe to interrupt and re-run
+```
+
+## Origin context
+
+"Which query is slow" is only half the answer — *where it comes from* is the half you can act on. Each capture records its origin automatically:
+
+| Execution | What gets recorded |
+|---|---|
+| HTTP request | route name, URI pattern, `Controller@action` |
+| Queue job | the job class |
+| Artisan command | the command name |
+| All of the above | the first `file:line` of *your* application code in the stack |
+
+The origin is shown on the query detail page and included in the AI prompt — which turns generic advice into *"add `->with('items')` to the query in `OrderController@index`"*.
+
+Two privacy notes, both deliberate defaults:
+
+```dotenv
+SLOWER_CAPTURE_ORIGIN=true    # set false to skip origin capture entirely
+SLOWER_CAPTURE_USER_ID=false  # opt in to also record the authenticated user id
+```
+
+The backtrace is taken only for queries that already crossed the threshold (so there is no per-query overhead), with `DEBUG_BACKTRACE_IGNORE_ARGS` — argument values never enter the trace.
+
+## Production controls
+
+Designed to be left on under real traffic:
+
+```dotenv
+SLOWER_SAMPLE_RATE=1.0        # capture this fraction of threshold-exceeding queries (0.0–1.0)
+SLOWER_MAX_PER_EXECUTION=50   # hard cap per request / job / command run
+```
+
+- **Sampling** — on very high-traffic apps, capture a representative fraction instead of every slow query. Counts become approximate; your database stays calm.
+- **Per-execution cap** — one runaway request or job can produce hundreds of slow queries; the cap stops it from flooding the log table.
+- **Circuit breaker** — if storing a capture *itself* fails (full disk, dropped table), Slower backs off for 60 seconds instead of adding a failed INSERT to every slow query in the process. Failures are still `report()`ed.
+- **Self-capture guard** — queries touching Slower's own table are never captured, so the logger cannot feed itself.
+
+## Privacy: what reaches your AI provider
+
+The AI payload is **safe by default** — this is the exact contract:
+
+| Payload part | Sent by default? | Contains |
+|---|---|---|
+| Parameterized SQL (`... where id = ?`) | ✅ yes | query shape, no values |
+| Schema & indexes of referenced tables | ✅ yes | column names/types, index definitions |
+| Origin context | ✅ yes (when captured) | route/job/command, code location |
+| `EXPLAIN` output | ✅ yes (configurable) | the plan — *may echo literal values on some drivers* |
+| Raw SQL with real values | ❌ opt-in | literals: emails, tokens, ids |
+| Bindings | ❌ opt-in | the actual parameter values |
+
+If your provider needs the real values for better advice, opt in explicitly — and put a redactor in front for defense in depth:
+
+```dotenv
+SLOWER_AI_SEND_RAW_SQL=true
+SLOWER_AI_SEND_BINDINGS=true
+```
+
+```php
+// config/slower.php
+'ai_payload' => [
+    'send_raw_sql' => env('SLOWER_AI_SEND_RAW_SQL', false),
+    'send_bindings' => env('SLOWER_AI_SEND_BINDINGS', false),
+    'redactor' => App\Support\SlowerRedactor::class,
+],
+```
+
+```php
+namespace App\Support;
+
+use HalilCosdu\Slower\Contracts\PayloadRedactor;
+
+class SlowerRedactor implements PayloadRedactor
+{
+    public function redactBindings(array $bindings): array
+    {
+        return array_map(
+            fn ($value) => is_string($value) && str_contains($value, '@') ? '[email]' : $value,
+            $bindings,
+        );
+    }
+
+    public function redactRawSql(string $rawSql): string
+    {
+        return preg_replace('/\b[\w.+-]+@[\w-]+\.[\w.]+\b/', '[email]', $rawSql);
+    }
+}
+```
+
+A misconfigured redactor (a class that doesn't implement the contract) throws instead of silently passing secrets. In strict environments also set `SLOWER_AI_RECOMMENDATION_USE_EXPLAIN=false`, since an `EXPLAIN` plan can echo literal values from the query.
+
+## Queued analysis
+
+An LLM round-trip takes seconds; by default Slower analyzes synchronously (no worker needed). On any app with a queue, flip one variable and analysis becomes background work:
+
+```dotenv
+SLOWER_ANALYZE_QUEUE=default   # any queue name; unset = synchronous
+```
+
+- The dashboard's *Analyze* buttons dispatch jobs and return immediately.
+- `php artisan slower:analyze --queue` queues every pending record instead of processing them inline.
+- Jobs are **unique per record** — double-clicks and overlapping scheduler runs can't queue duplicate (billable) analyses.
+- Failures follow your queue's retry semantics, and a record is only marked analyzed when a recommendation was actually stored.
+
+```php
+// A worker for that queue, and you're done:
+php artisan queue:work --queue=default
+```
+
+## Events
+
+Slower ships **events, not notification channels** — wire them to whatever your team uses:
+
+- `HalilCosdu\Slower\Events\SlowQueryCaptured` — fired for every stored capture.
+- `HalilCosdu\Slower\Events\SlowQueryFirstSeen` — fired only the first time a query *shape* is ever captured. This is the "a new slow query appeared" signal, without the noise of repeats.
+
+A complete Slack alert in ~15 lines — listen for first-seen shapes and notify:
+
+```php
+// app/Providers/AppServiceProvider.php
+use HalilCosdu\Slower\Events\SlowQueryFirstSeen;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Notification;
+
+public function boot(): void
+{
+    Event::listen(function (SlowQueryFirstSeen $event) {
+        Notification::route('slack', config('services.slack.alerts_webhook'))
+            ->notify(new \App\Notifications\NewSlowQuery($event->record));
+    });
+}
+```
+
+```php
+// app/Notifications/NewSlowQuery.php (the interesting part)
+public function toSlack(object $notifiable): SlackMessage
+{
+    $origin = $this->record->origin['action'] ?? $this->record->origin['job'] ?? 'unknown origin';
+
+    return (new SlackMessage)
+        ->text(sprintf(
+            '🐌 New slow query (%.0f ms) from %s: %s',
+            $this->record->time,
+            $origin,
+            \Illuminate\Support\Str::limit($this->record->sql, 120),
+        ));
+}
+```
+
 ## Configuration
 
 This is the full contents of the published config file:
@@ -135,6 +317,14 @@ return [
     'enabled' => env('SLOWER_ENABLED', true),
     'threshold' => env('SLOWER_THRESHOLD', 10000), // ms
     'ai_service' => env('SLOWER_AI_SERVICE', 'openai'),
+    'capture' => [
+        'sample_rate' => env('SLOWER_SAMPLE_RATE', 1.0),
+        'max_per_execution' => env('SLOWER_MAX_PER_EXECUTION', 50),
+        'origin' => [
+            'enabled' => env('SLOWER_CAPTURE_ORIGIN', true),
+            'user_id' => env('SLOWER_CAPTURE_USER_ID', false),
+        ],
+    ],
     'resources' => [
         'table_name' => (new SlowLog)->getTable(),
         'model' => SlowLog::class,
@@ -151,6 +341,13 @@ return [
         'analyze_pending_limit' => 10,
     ],
     'ai_recommendation' => env('SLOWER_AI_RECOMMENDATION', true),
+    // null = analyze synchronously; a queue name = analyze as background jobs
+    'analyze_queue' => env('SLOWER_ANALYZE_QUEUE'),
+    'ai_payload' => [
+        'send_raw_sql' => env('SLOWER_AI_SEND_RAW_SQL', false),
+        'send_bindings' => env('SLOWER_AI_SEND_BINDINGS', false),
+        'redactor' => null, // class-string implementing Contracts\PayloadRedactor
+    ],
     // null → a sensible low-cost default for the selected provider
     'recommendation_model' => env('SLOWER_AI_RECOMMENDATION_MODEL'),
     'recommendation_use_explain' => env('SLOWER_AI_RECOMMENDATION_USE_EXPLAIN', true),
@@ -163,7 +360,10 @@ return [
 A few keys worth tuning:
 
 - **`threshold`** — the millisecond bar for "slow". Lower it in staging to surface more, raise it in production to keep the table lean.
+- **`capture.sample_rate` / `capture.max_per_execution`** — the [production controls](#production-controls) for high-traffic apps.
 - **`ai_recommendation`** — set to `false` to keep logging slow queries while never calling an AI API (no charges).
+- **`analyze_queue`** — a queue name to make analysis [background work](#queued-analysis); `null` keeps it synchronous.
+- **`ai_payload`** — the [privacy contract](#privacy-what-reaches-your-ai-provider) for what reaches your provider.
 - **`recommendation_use_explain`** — attaches a safe, read-only `EXPLAIN` plan to the prompt for sharper advice.
 
 ## AI providers
@@ -267,8 +467,10 @@ Then set `SLOWER_AI_SERVICE=my-llm`.
 ## Commands and scheduling
 
 ```bash
-php artisan slower:analyze      # analyze every record where is_analyzed=false
-php artisan slower:clean 15     # delete records older than 15 days
+php artisan slower:analyze           # analyze every record where is_analyzed=false
+php artisan slower:analyze --queue   # ...as unique background jobs instead
+php artisan slower:clean 15          # delete records older than 15 days
+php artisan slower:fingerprint       # one-time: fingerprint records captured before v3.2
 ```
 
 Run them on a schedule so analysis and retention take care of themselves:
@@ -317,6 +519,21 @@ SlowLog::query()
     ->limit(20)
     ->get()
     ->each(fn (SlowLog $log) => Slower::analyze($log));
+
+// The most frequent slow query shapes (what the Grouped view shows).
+SlowLog::query()
+    ->whereNotNull('fingerprint')
+    ->selectRaw('fingerprint, count(*) as occurrences, max(time) as max_time')
+    ->groupBy('fingerprint')
+    ->orderByDesc('occurrences')
+    ->limit(5)
+    ->get();
+
+// Where did this one come from?
+$record->fingerprint;        // 40-char shape hash, shared by all repeats
+$record->origin;             // ['type' => 'http', 'route' => 'orders.index',
+                             //  'action' => 'App\...\OrderController@index',
+                             //  'frame' => 'app/Http/Controllers/OrderController.php:38']
 ```
 
 <details>

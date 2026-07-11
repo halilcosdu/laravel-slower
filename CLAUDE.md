@@ -24,10 +24,18 @@ vendor/bin/pest --filter="analyzes a model"       # Run specific test
 ### Flow: Query Detection -> Logging -> AI Analysis
 
 1. `SlowerServiceProvider` registers a `DB::listen()` callback that captures queries exceeding `threshold` ms
-2. Slow queries are logged to the `slow_logs` table (configurable table name/model via `resources` config)
-3. EXPLAIN and INSERT queries are filtered based on config flags
-4. `slower:analyze` command (or `Slower::analyze($model)`) processes unanalyzed records
-5. `RecommendationService` extracts table schema, builds a prompt, sends to the AI driver, and stores the recommendation
+2. Guards run cheapest-first: circuit breaker (`ExecutionContext::isSuspended`, 60s after a storage failure), self-capture (table-name), sampling (`capture.sample_rate`), per-execution cap (`capture.max_per_execution`)
+3. Slow queries are logged to the `slow_logs` table (configurable table name/model via `resources` config) with a `fingerprint` (versioned, from `Support/SqlFingerprinter` over the parameterized SQL), `fingerprint_version`, and `origin` json (from `Services/ExecutionContext`: http route/action, job class, artisan command, first app `file:line`; user_id opt-in)
+4. `SlowQueryCaptured` fires per capture; `SlowQueryFirstSeen` when a fingerprint appears for the first time (events in `src/Events/`)
+5. EXPLAIN and INSERT queries are filtered based on config flags
+6. `slower:analyze` command (or `Slower::analyze($model)`, or the unique-per-record `Jobs/AnalyzeSlowLog` when `analyze_queue` is set) processes unanalyzed records
+7. `RecommendationService` extracts table schema, builds the payload (parameterized SQL + origin by default; raw_sql/bindings only when `ai_payload` opts in, through an optional `Contracts/PayloadRedactor`), sends to the AI driver, and stores the recommendation
+
+`ExecutionContext` is a per-process singleton; execution boundaries (RouteMatched, JobProcessing, CommandStarting) reset its capture counter and set origin state — this keeps queue workers/Octane correct.
+
+### Dashboard
+
+Routes under `/slower` (gate `viewSlower`, local-only by default). `DashboardController::index` serves two modes: `?view=events` (default, one row per capture, `?fingerprint=` drill-down filter) and `?view=grouped` (GROUP BY fingerprint+connection with occurrences/avg/max/last-seen, representative SQL via `max(id)` lookup — no window functions, sqlite/mysql/pgsql portable).
 
 ### AI Driver System
 
@@ -42,21 +50,25 @@ To add a custom provider: `AiServiceManager::extend('name', fn () => new YourDri
 
 - `enabled` / `ai_recommendation` - Toggle package and AI analysis independently
 - `threshold` - Query time in ms to trigger logging (default: 10000)
+- `capture` - `sample_rate` (0–1), `max_per_execution` (default 50), `origin.enabled` / `origin.user_id` (user id default OFF — privacy)
 - `ai_service` - Provider name (default: `openai`; also anthropic, gemini, ollama, or a custom driver)
+- `analyze_queue` - null = synchronous analysis; a queue name = dispatch `AnalyzeSlowLog` jobs
+- `ai_payload` - `send_raw_sql` / `send_bindings` (both default false — safe payload) + `redactor` class-string
 - `recommendation_model` - AI model (default: `null` → a low-cost per-provider default)
-- `recommendation_use_explain` - Include EXPLAIN ANALYSE output in prompts
+- `recommendation_use_explain` - Include safe EXPLAIN output in prompts (may echo literals on some drivers)
 - `ignore_explain_queries` / `ignore_insert_queries` - Skip these query types from logging
 
 ### Artisan Commands
 
-- `slower:analyze` - Processes unanalyzed records (`is_analyzed=false`) in chunks of 1000
+- `slower:analyze {--queue}` - Processes unanalyzed records (`is_analyzed=false`) in chunks of 1000; `--queue` dispatches unique jobs instead
 - `slower:clean {days=15}` - Deletes records older than specified days
+- `slower:fingerprint` - Backfills fingerprints for pre-3.2 records / older algorithm versions (chunked, idempotent)
 
 ## Testing
 
 Tests use Pest PHP with Orchestra Testbench for package testing. Base `TestCase` registers `SlowerServiceProvider` and uses an in-memory SQLite database (`database.default = testing`).
 
-Test files: `SlowerTest` (core analysis), `ConfigTest` (config defaults), `CommandsTest` (command signatures), `SlowerServiceProviderTest` (listener registration, `normalizeBindings`).
+Test files: `SlowerTest` (core analysis), `ConfigTest` (config defaults), `CommandsTest` (command signatures), `SlowerServiceProviderTest` (listener registration, `normalizeBindings`), `SqlFingerprinterTest` (golden fixtures: same-shape queries must share a fingerprint, distinct shapes must not), `CapturePipelineTest` (sampling/caps/breaker/events, uses `threshold=0`), `ExecutionContextTest` (origin resolution per execution type), `AiPayloadTest` (canary secrets must never reach the driver by default), `QueuedAnalysisTest`, `DashboardGroupedViewTest`, `MigrationTest` (legacy-table upgrade path).
 
 ## CI
 

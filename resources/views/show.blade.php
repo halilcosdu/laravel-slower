@@ -49,7 +49,35 @@
             <span class="stat-label">Captured</span>
             <span class="meta-value" title="{{ $record->created_at }}">{{ $record->created_at?->diffForHumans() }}</span>
         </div>
+        @if (filled($record->fingerprint))
+            <div class="meta-cell">
+                <span class="stat-label">Query group</span>
+                <a class="meta-value meta-link" title="{{ $record->fingerprint }}"
+                   href="{{ route('slower.index', ['fingerprint' => $record->fingerprint]) }}">{{ \Illuminate\Support\Str::limit($record->fingerprint, 12, '…') }}</a>
+            </div>
+        @endif
     </div>
+
+    @if (filled($record->origin))
+        <div class="panel">
+            <div class="panel-head">
+                <h2>Origin</h2>
+                <span class="badge badge-origin">{{ $record->origin['type'] ?? 'unknown' }}</span>
+            </div>
+            <div class="panel-body">
+                <dl class="origin-list">
+                    @foreach (['route' => 'Route', 'uri' => 'URI', 'action' => 'Action', 'job' => 'Job', 'command' => 'Command', 'frame' => 'Code', 'user_id' => 'User'] as $key => $label)
+                        @if (filled($record->origin[$key] ?? null))
+                            <div class="origin-row">
+                                <dt>{{ $label }}</dt>
+                                <dd><code>{{ $record->origin[$key] }}</code></dd>
+                            </div>
+                        @endif
+                    @endforeach
+                </dl>
+            </div>
+        </div>
+    @endif
 
     <div class="panel">
         <div class="panel-head">

@@ -3,7 +3,10 @@
 namespace HalilCosdu\Slower\Services;
 
 use HalilCosdu\Slower\AiServiceDrivers\Contracts\AiServiceDriver;
+use HalilCosdu\Slower\Contracts\PayloadRedactor;
+use HalilCosdu\Slower\Support\PassthroughRedactor;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 class RecommendationService
 {
@@ -11,12 +14,7 @@ class RecommendationService
 
     public function getRecommendation($record): ?string
     {
-        $schema = $this->extractIndexesAndSchemaFromRecord($record);
-        $userMessage = 'The query execution took '.$record->time.' milliseconds.'.PHP_EOL.
-            'Connection: '.$record->connection.PHP_EOL.
-            'Connection Name: '.$record->connection_name.PHP_EOL.
-            'Schema: '.json_encode($schema, JSON_PRETTY_PRINT).PHP_EOL.
-            'Sql: '.$record->sql.PHP_EOL;
+        $userMessage = $this->buildPayload($record);
 
         if (config('slower.recommendation_use_explain', false)) {
             if ($plan = $this->getExplainPlan($record)) {
@@ -38,6 +36,61 @@ class RecommendationService
         }
 
         return $recommendation;
+    }
+
+    /**
+     * What leaves the application towards the AI provider. Safe by default:
+     * the parameterized SQL (no literal values) plus schema and origin
+     * context. Raw SQL and bindings are opt-in (`slower.ai_payload`) and
+     * pass through the configured redactor. Note that when EXPLAIN output is
+     * enabled it may echo literal values from the plan — disable
+     * `recommendation_use_explain` in strict environments.
+     */
+    private function buildPayload($record): string
+    {
+        $schema = $this->extractIndexesAndSchemaFromRecord($record);
+
+        $payload = 'The query execution took '.$record->time.' milliseconds.'.PHP_EOL.
+            'Connection: '.$record->connection.PHP_EOL.
+            'Connection Name: '.$record->connection_name.PHP_EOL;
+
+        if (filled($record->origin ?? null)) {
+            $payload .= 'Origin: '.json_encode($record->origin).PHP_EOL;
+        }
+
+        $payload .= 'Schema: '.json_encode($schema, JSON_PRETTY_PRINT).PHP_EOL.
+            'Sql: '.$record->sql.PHP_EOL;
+
+        if (config('slower.ai_payload.send_raw_sql', false)) {
+            $payload .= 'Raw Sql: '.$this->redactor()->redactRawSql((string) $record->raw_sql).PHP_EOL;
+        }
+
+        if (config('slower.ai_payload.send_bindings', false)) {
+            $bindings = is_array($record->bindings) ? $record->bindings : [];
+            $payload .= 'Bindings: '.json_encode($this->redactor()->redactBindings($bindings)).PHP_EOL;
+        }
+
+        return $payload;
+    }
+
+    private function redactor(): PayloadRedactor
+    {
+        $class = config('slower.ai_payload.redactor');
+
+        if ($class === null) {
+            return new PassthroughRedactor;
+        }
+
+        $redactor = app($class);
+
+        if (! $redactor instanceof PayloadRedactor) {
+            // Fail loudly: a misconfigured redactor must never silently pass secrets.
+            throw new InvalidArgumentException(sprintf(
+                'slower.ai_payload.redactor [%s] must implement %s.', $class, PayloadRedactor::class
+            ));
+        }
+
+        return $redactor;
     }
 
     /**

@@ -2,6 +2,33 @@
 
 All notable changes to `laravel-slower` will be documented in this file.
 
+## v3.2.0 - 2026-07-11
+
+The first phase of the 2026 roadmap: **safe capture foundation**. Slower becomes something you confidently leave on in production — and every capture now knows what it is (fingerprint) and where it came from (origin).
+
+### Added
+- **Query fingerprints & the Grouped view.** Every capture gets a versioned, connection-scoped fingerprint computed from the *parameterized* SQL (literals, whitespace, placeholder style and `IN (...)` sizes normalized away). The dashboard gains an *Events | Grouped* toggle: one row per query shape with occurrence count, avg/max duration and last-seen, with drill-down to the underlying events. `php artisan slower:fingerprint` backfills existing records (chunked, idempotent).
+- **Origin context.** Captures record their origin — HTTP route/URI/`Controller@action`, queue job class, or artisan command — plus the first `file:line` of application code in the stack (taken only for threshold-exceeding queries, with `DEBUG_BACKTRACE_IGNORE_ARGS`). Shown on the detail page and included in the AI prompt for sharper advice. The authenticated user id is **opt-in** (`SLOWER_CAPTURE_USER_ID`); origin capture itself can be disabled.
+- **Production controls.** `capture.sample_rate` (capture a fraction of slow queries), `capture.max_per_execution` (hard cap per request/job/command), a 60-second circuit breaker when storing captures fails, and a hardened self-capture guard.
+- **Safe-by-default AI payload.** Only the parameterized SQL (plus schema, origin and EXPLAIN context) leaves the application. Raw SQL and bindings are explicit opt-ins (`ai_payload.send_raw_sql` / `send_bindings`) and pass through an optional `PayloadRedactor` implementation; a misconfigured redactor throws instead of silently passing secrets. Canary-secret tests pin the contract.
+- **Queued analysis.** Set `SLOWER_ANALYZE_QUEUE=<queue>` and the dashboard's analyze actions dispatch unique-per-record background jobs instead of blocking the request; `slower:analyze --queue` does the same for bulk analysis. Unset, everything stays synchronous — no worker required.
+- **Events.** `SlowQueryCaptured` (every capture) and `SlowQueryFirstSeen` (first time a query shape appears) — wire them to Slack/mail/webhooks with a plain Laravel listener; the package deliberately ships no notification channels.
+
+### Changed
+- New records store `fingerprint`, `fingerprint_version` and `origin` (additive migration; existing rows keep working and can be backfilled).
+- The AI prompt now includes the origin context when available.
+
+### Upgrade
+Publish and run the new migration, then optionally backfill fingerprints:
+
+```bash
+php artisan vendor:publish --tag="slower-migrations"
+php artisan migrate
+php artisan slower:fingerprint
+```
+
+No breaking changes: the events view, existing config keys, `AiServiceDriver`, and the sync analysis path are untouched. New config keys all have safe defaults — to customize them, re-publish the config or copy the `capture` / `ai_payload` / `analyze_queue` blocks from the README.
+
 ## v3.1.1 - 2026-07-11
 
 ### Documentation
