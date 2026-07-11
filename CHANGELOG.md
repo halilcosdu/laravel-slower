@@ -13,7 +13,7 @@ All notable changes to `laravel-slower` will be documented in this file.
 - Replaced the `openai-php/laravel` dependency with `prism-php/prism`. The whole integration lives behind one `PrismDriver`, so the rest of the package is decoupled from the provider layer.
 
 ### Upgrade
-Existing OpenAI users need **no changes** — Prism reads your `OPENAI_API_KEY`, and a boot-time bridge still honors a legacy `slower.open_ai.api_key`. To use Claude or Gemini: `composer update`, set `ANTHROPIC_API_KEY`/`GEMINI_API_KEY`, and set `SLOWER_AI_SERVICE`. If your old published config hardcodes `recommendation_model`, clear it (or set the new provider's model) before switching providers. If you had set `OPENAI_TIMEOUT` for long analyses, set `PRISM_REQUEST_TIMEOUT` (seconds) instead — Prism's default is 30.
+Existing OpenAI users need **no changes** — Prism reads your `OPENAI_API_KEY`, and a boot-time bridge still honors a legacy `slower.open_ai.api_key`. To use Claude or Gemini: `composer update`, set `ANTHROPIC_API_KEY`/`GEMINI_API_KEY`, and set `SLOWER_AI_SERVICE`. If your old published config hardcodes `recommendation_model`, clear it (or set the new provider's model) before switching providers. AI requests now time out after Prism's default of **30 seconds**; if your analyses legitimately run longer (very large schemas or a slow model), raise it with `PRISM_REQUEST_TIMEOUT` (seconds). Users who previously relied on `OPENAI_TIMEOUT` should set `PRISM_REQUEST_TIMEOUT` instead.
 
 ## v3.0.0 - 2026-07-11
 
