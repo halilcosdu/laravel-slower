@@ -5,10 +5,13 @@
 @php
     $currentSort = $filters['sort'];
     $currentDirection = $filters['direction'];
+    $grouped = $view === 'grouped';
     $baseQuery = array_filter([
         'search' => $filters['search'],
         'status' => $filters['status'],
         'connection' => $filters['connection'],
+        'fingerprint' => $filters['fingerprint'],
+        'view' => $grouped ? 'grouped' : '',
     ], fn ($value) => $value !== '');
     $sortLink = function (string $column) use ($currentSort, $currentDirection, $baseQuery) {
         $direction = $currentSort === $column && $currentDirection === 'desc' ? 'asc' : 'desc';
@@ -21,7 +24,7 @@
     $sortArrow = fn (string $column) => $currentSort === $column
         ? ($currentDirection === 'asc' ? '▲' : '▼')
         : '';
-    $filtered = $baseQuery !== [];
+    $filtered = array_diff_key($baseQuery, ['view' => null]) !== [];
 @endphp
 
 @section('content')
@@ -58,31 +61,110 @@
         </div>
     </section>
 
-    <form class="filters" method="GET" action="{{ route('slower.index') }}" data-autosubmit>
-        <input type="search" name="search" value="{{ $filters['search'] }}" placeholder="Search captured SQL…" aria-label="Search captured SQL">
-        <select name="status" aria-label="Filter by status">
-            <option value="">All statuses</option>
-            <option value="pending" @selected($filters['status'] === 'pending')>Pending</option>
-            <option value="analyzed" @selected($filters['status'] === 'analyzed')>Analyzed</option>
-        </select>
-        <select name="connection" aria-label="Filter by connection">
-            <option value="">All connections</option>
-            @foreach ($connections as $connection)
-                <option value="{{ $connection }}" @selected($filters['connection'] === $connection)>{{ $connection }}</option>
-            @endforeach
-        </select>
-        @if ($currentSort)
-            <input type="hidden" name="sort" value="{{ $currentSort }}">
-            <input type="hidden" name="direction" value="{{ $currentDirection }}">
-        @endif
-        <button type="submit" class="btn">Filter</button>
-        @if ($filtered)
-            <a class="filters-reset" href="{{ route('slower.index') }}">Reset</a>
-        @endif
-    </form>
+    <div class="list-controls">
+        <nav class="view-toggle" aria-label="List mode">
+            <a class="view-toggle-item {{ $grouped ? '' : 'is-active' }}"
+               href="{{ route('slower.index', array_diff_key($baseQuery, ['view' => null, 'fingerprint' => null])) }}">Events</a>
+            <a class="view-toggle-item {{ $grouped ? 'is-active' : '' }}"
+               href="{{ route('slower.index', array_merge(array_diff_key($baseQuery, ['fingerprint' => null]), ['view' => 'grouped'])) }}">Grouped</a>
+        </nav>
+
+        <form class="filters" method="GET" action="{{ route('slower.index') }}" data-autosubmit>
+            @if ($grouped)
+                <input type="hidden" name="view" value="grouped">
+            @endif
+            <input type="search" name="search" value="{{ $filters['search'] }}" placeholder="Search captured SQL…" aria-label="Search captured SQL">
+            <select name="status" aria-label="Filter by status">
+                <option value="">All statuses</option>
+                <option value="pending" @selected($filters['status'] === 'pending')>Pending</option>
+                <option value="analyzed" @selected($filters['status'] === 'analyzed')>Analyzed</option>
+            </select>
+            <select name="connection" aria-label="Filter by connection">
+                <option value="">All connections</option>
+                @foreach ($connections as $connection)
+                    <option value="{{ $connection }}" @selected($filters['connection'] === $connection)>{{ $connection }}</option>
+                @endforeach
+            </select>
+            @if ($currentSort)
+                <input type="hidden" name="sort" value="{{ $currentSort }}">
+                <input type="hidden" name="direction" value="{{ $currentDirection }}">
+            @endif
+            <button type="submit" class="btn">Filter</button>
+            @if ($filtered)
+                <a class="filters-reset" href="{{ route('slower.index') }}">Reset</a>
+            @endif
+        </form>
+    </div>
+
+    @if (! $grouped && $filters['fingerprint'] !== '')
+        <div class="notice">
+            <span>Showing events for query group <code>{{ \Illuminate\Support\Str::limit($filters['fingerprint'], 12, '…') }}</code></span>
+            <a href="{{ route('slower.index', ['view' => 'grouped']) }}">Back to groups</a>
+        </div>
+    @endif
+
+    @if ($grouped && $unfingerprinted > 0)
+        <div class="notice">
+            <span>{{ number_format($unfingerprinted) }} {{ $unfingerprinted === 1 ? 'record' : 'records' }} captured before v3.2 {{ $unfingerprinted === 1 ? 'has' : 'have' }} no fingerprint yet and {{ $unfingerprinted === 1 ? 'is' : 'are' }} not grouped — run <code>php artisan slower:fingerprint</code> once to include {{ $unfingerprinted === 1 ? 'it' : 'them' }}.</span>
+        </div>
+    @endif
 
     <div class="queries-panel">
-        @if ($records->isEmpty())
+        @if ($grouped)
+            @if ($groups->isEmpty())
+                <div class="empty-state">
+                    <div class="empty-mark">~ 0 groups</div>
+                    <h2>{{ $filtered ? 'Nothing matches these filters' : 'No query groups yet' }}</h2>
+                    @if ($filtered)
+                        <p>Try widening the search or <a href="{{ route('slower.index', ['view' => 'grouped']) }}">reset the filters</a>.</p>
+                    @else
+                        <p>Each captured query gets a fingerprint; repeats of the same shape are grouped here so you can fix the most frequent offenders first.</p>
+                    @endif
+                </div>
+            @else
+                <table class="queries">
+                    <thead>
+                        <tr>
+                            <th scope="col">Query group</th>
+                            <th scope="col" class="cell-time">
+                                <a href="{{ $sortLink('count') }}">Occurrences <span class="sort-arrow">{{ $sortArrow('count') }}</span></a>
+                            </th>
+                            <th scope="col" class="cell-time">
+                                <a href="{{ $sortLink('time') }}">Max <span class="sort-arrow">{{ $sortArrow('time') }}</span></a>
+                            </th>
+                            <th scope="col" class="cell-time">Avg</th>
+                            <th scope="col" class="th-connection">Connection</th>
+                            <th scope="col" class="th-when">
+                                <a href="{{ $sortLink('date') }}">Last seen <span class="sort-arrow">{{ $sortArrow('date') }}</span></a>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($groups as $group)
+                            @php $representative = $representatives->get($group->latest_id); @endphp
+                            <tr>
+                                <td>
+                                    <a class="query-sql"
+                                       href="{{ route('slower.index', array_filter(['fingerprint' => $group->fingerprint, 'connection' => $group->connection_name])) }}">{{ \Illuminate\Support\Str::limit($representative?->raw_sql ?? $group->fingerprint, 90) }}</a>
+                                    <div class="query-meta"><code>{{ \Illuminate\Support\Str::limit($group->fingerprint, 12, '…') }}</code></div>
+                                </td>
+                                <td class="cell-time">
+                                    <span class="badge badge-count">×{{ number_format((int) $group->occurrences) }}</span>
+                                </td>
+                                <td class="cell-time">
+                                    <span class="time-value">{{ number_format((float) $group->max_time) }} <span class="stat-unit">ms</span></span>
+                                </td>
+                                <td class="cell-time">
+                                    <span class="time-value">{{ number_format((float) $group->avg_time) }} <span class="stat-unit">ms</span></span>
+                                </td>
+                                <td class="cell-connection">{{ $group->connection_name }}</td>
+                                <td class="cell-when" title="{{ $group->last_seen_at }}">{{ \Illuminate\Support\Carbon::parse($group->last_seen_at)->diffForHumans(short: true) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+        @elseif ($records->isEmpty())
             <div class="empty-state">
                 <div class="empty-mark">~ 0 rows</div>
                 <h2>{{ $filtered ? 'Nothing matches these filters' : 'No slow queries captured yet' }}</h2>
@@ -136,8 +218,9 @@
         @endif
     </div>
 
-    @if ($records->hasPages())
-        {{ $records->links('slower::partials.pagination') }}
+    @php $paginator = $grouped ? $groups : $records; @endphp
+    @if ($paginator->hasPages())
+        {{ $paginator->links('slower::partials.pagination') }}
     @endif
 
     @if ($stats['total'] > 0)

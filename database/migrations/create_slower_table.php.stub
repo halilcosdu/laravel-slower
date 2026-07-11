@@ -18,6 +18,9 @@ return new class extends Migration
             $table->string('connection_name')->nullable();
             $table->longtext('raw_sql');
             $table->longtext('recommendation')->nullable();
+            $table->string('fingerprint', 64)->nullable()->index();
+            $table->unsignedTinyInteger('fingerprint_version')->nullable();
+            $table->json('origin')->nullable();
 
             $table->timestamps();
         });

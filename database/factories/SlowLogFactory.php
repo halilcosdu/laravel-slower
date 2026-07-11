@@ -3,6 +3,7 @@
 namespace HalilCosdu\Slower\Database\Factories;
 
 use HalilCosdu\Slower\Models\SlowLog;
+use HalilCosdu\Slower\Support\SqlFingerprinter;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -14,15 +15,20 @@ class SlowLogFactory extends Factory
 
     public function definition(): array
     {
+        $sql = 'select * from users where id = ?';
+
         return [
             'is_analyzed' => false,
             'bindings' => [],
-            'sql' => 'select * from users where id = ?',
+            'sql' => $sql,
             'time' => 15000.0,
             'connection' => 'Illuminate\Database\SQLiteConnection',
             'connection_name' => 'testing',
             'raw_sql' => 'select * from users where id = 1',
             'recommendation' => null,
+            'fingerprint' => (new SqlFingerprinter)->fingerprint($sql),
+            'fingerprint_version' => SqlFingerprinter::VERSION,
+            'origin' => null,
         ];
     }
 }

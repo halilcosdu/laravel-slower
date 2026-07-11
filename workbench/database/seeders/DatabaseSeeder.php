@@ -3,6 +3,7 @@
 namespace Workbench\Database\Seeders;
 
 use HalilCosdu\Slower\Models\SlowLog;
+use HalilCosdu\Slower\Support\SqlFingerprinter;
 use Illuminate\Database\Seeder;
 use Illuminate\Database\SQLiteConnection;
 
@@ -36,6 +37,13 @@ MD;
                 'is_analyzed' => true,
                 'recommendation' => $recommendation,
                 'created_at' => now()->subMinutes(42),
+                'origin' => [
+                    'type' => 'http',
+                    'route' => 'orders.index',
+                    'uri' => 'orders',
+                    'action' => 'App\Http\Controllers\OrderController@index',
+                    'frame' => 'app/Http/Controllers/OrderController.php:38',
+                ],
             ],
             [
                 'sql' => 'select count(*) as aggregate from `order_items` inner join `products` on `products`.`id` = `order_items`.`product_id` where `products`.`category_id` = ?',
@@ -46,6 +54,11 @@ MD;
                 'connection_name' => 'sqlite',
                 'is_analyzed' => false,
                 'created_at' => now()->subHours(2),
+                'origin' => [
+                    'type' => 'queue',
+                    'job' => 'App\Jobs\RefreshCategoryCounters',
+                    'frame' => 'app/Jobs/RefreshCategoryCounters.php:52',
+                ],
             ],
             [
                 'sql' => 'select `users`.*, (select count(*) from `logins` where `logins`.`user_id` = `users`.`id`) as `logins_count` from `users` where `last_seen_at` > ?',
@@ -98,6 +111,11 @@ MD;
                 'connection_name' => 'sqlite',
                 'is_analyzed' => false,
                 'created_at' => now()->subDays(2),
+                'origin' => [
+                    'type' => 'console',
+                    'command' => 'carts:mark-abandoned',
+                    'frame' => 'app/Console/Commands/MarkAbandonedCarts.php:31',
+                ],
             ],
             [
                 'sql' => 'select distinct `sku` from `warehouse_stock` inner join `warehouses` on `warehouses`.`id` = `warehouse_stock`.`warehouse_id` where `warehouses`.`region` = ? and `quantity` < ?',
@@ -112,8 +130,49 @@ MD;
             ],
         ];
 
-        foreach ($samples as $sample) {
-            SlowLog::query()->forceCreate($sample);
+        // The orders listing fires on every dashboard page view in the demo
+        // app: repeat it with different bindings so the Grouped view has a
+        // clearly dominant group to show off.
+        foreach ([['completed', 38210.2, 55], ['pending', 35875.0, 3], ['refunded', 29441.8, 8], ['pending', 27103.3, 16], ['completed', 21990.1, 26]] as [$status, $time, $hoursAgo]) {
+            $samples[] = [
+                'sql' => 'select * from `orders` where `status` = ? and `created_at` >= ? order by `created_at` desc',
+                'raw_sql' => "select * from `orders` where `status` = '{$status}' and `created_at` >= '2026-06-01 00:00:00' order by `created_at` desc",
+                'bindings' => [$status, '2026-06-01 00:00:00'],
+                'time' => $time,
+                'connection' => SQLiteConnection::class,
+                'connection_name' => 'sqlite',
+                'is_analyzed' => false,
+                'created_at' => now()->subHours($hoursAgo),
+                'origin' => [
+                    'type' => 'http',
+                    'route' => 'orders.index',
+                    'uri' => 'orders',
+                    'action' => 'App\Http\Controllers\OrderController@index',
+                    'frame' => 'app/Http/Controllers/OrderController.php:38',
+                ],
+            ];
         }
+
+        $fingerprinter = new SqlFingerprinter;
+
+        foreach ($samples as $sample) {
+            SlowLog::query()->forceCreate($sample + [
+                'fingerprint' => $fingerprinter->fingerprint($sample['sql']),
+                'fingerprint_version' => SqlFingerprinter::VERSION,
+            ]);
+        }
+
+        // One pre-v3.2 record so the Grouped view demonstrates the
+        // `slower:fingerprint` backfill hint.
+        SlowLog::query()->forceCreate([
+            'sql' => 'select * from `legacy_reports` where `generated_at` < ?',
+            'raw_sql' => "select * from `legacy_reports` where `generated_at` < '2026-01-01'",
+            'bindings' => ['2026-01-01'],
+            'time' => 18220.0,
+            'connection' => SQLiteConnection::class,
+            'connection_name' => 'sqlite',
+            'is_analyzed' => false,
+            'created_at' => now()->subDays(5),
+        ]);
     }
 }

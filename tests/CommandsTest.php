@@ -8,7 +8,7 @@ use HalilCosdu\Slower\Models\SlowLog;
 describe('AnalyzeQuery command', function () {
     it('has correct signature', function () {
         $command = new AnalyzeQuery;
-        expect($command->signature)->toBe('slower:analyze');
+        expect($command->signature)->toBe('slower:analyze {--queue : Dispatch analysis jobs instead of analyzing inline}');
     });
 
     it('has correct description', function () {

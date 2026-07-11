@@ -4,11 +4,11 @@ use HalilCosdu\Slower\AiServiceDrivers\Contracts\AiServiceDriver;
 use HalilCosdu\Slower\Models\SlowLog;
 use HalilCosdu\Slower\Services\RecommendationService;
 
-describe('getTableNamesFromRawQuery', function () {
+describe('getTableNames', function () {
     $extract = function (string $sql): array {
         $service = app(RecommendationService::class);
         $reflection = new ReflectionClass($service);
-        $method = $reflection->getMethod('getTableNamesFromRawQuery');
+        $method = $reflection->getMethod('getTableNames');
         $method->setAccessible(true);
 
         return $method->invoke($service, $sql);

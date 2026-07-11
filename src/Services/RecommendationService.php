@@ -3,7 +3,10 @@
 namespace HalilCosdu\Slower\Services;
 
 use HalilCosdu\Slower\AiServiceDrivers\Contracts\AiServiceDriver;
+use HalilCosdu\Slower\Contracts\PayloadRedactor;
+use HalilCosdu\Slower\Support\PassthroughRedactor;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 class RecommendationService
 {
@@ -11,16 +14,15 @@ class RecommendationService
 
     public function getRecommendation($record): ?string
     {
-        $schema = $this->extractIndexesAndSchemaFromRecord($record);
-        $userMessage = 'The query execution took '.$record->time.' milliseconds.'.PHP_EOL.
-            'Connection: '.$record->connection.PHP_EOL.
-            'Connection Name: '.$record->connection_name.PHP_EOL.
-            'Schema: '.json_encode($schema, JSON_PRETTY_PRINT).PHP_EOL.
-            'Sql: '.$record->sql.PHP_EOL;
+        $userMessage = $this->buildPayload($record);
 
         if (config('slower.recommendation_use_explain', false)) {
             if ($plan = $this->getExplainPlan($record)) {
-                $userMessage .= 'EXPLAIN output: '.$plan.PHP_EOL;
+                // The plan can echo literal values on some drivers (e.g. pgsql
+                // `Filter: (col = 'secret')`), so it goes through the same
+                // redactor as raw SQL — a configured redactor covers every
+                // outbound path, not just the opt-in raw_sql/bindings.
+                $userMessage .= 'EXPLAIN output: '.$this->redactor()->redactRawSql($plan).PHP_EOL;
             }
         }
 
@@ -41,6 +43,72 @@ class RecommendationService
     }
 
     /**
+     * What leaves the application towards the AI provider. Safe by default:
+     * the parameterized SQL (no literal values) plus schema and origin
+     * context. Raw SQL and bindings are opt-in (`slower.ai_payload`) and
+     * pass through the configured redactor. Note that when EXPLAIN output is
+     * enabled it may echo literal values from the plan — disable
+     * `recommendation_use_explain` in strict environments.
+     */
+    private function buildPayload($record): string
+    {
+        $schema = $this->extractIndexesAndSchemaFromRecord($record);
+
+        $payload = 'The query execution took '.$record->time.' milliseconds.'.PHP_EOL.
+            'Connection: '.$record->connection.PHP_EOL.
+            'Connection Name: '.$record->connection_name.PHP_EOL;
+
+        // user_id is captured for the dashboard (and only as an opt-in); the
+        // LLM gains nothing from it, so it never enters the payload.
+        $origin = collect($record->origin ?? [])->except('user_id');
+
+        if ($origin->isNotEmpty()) {
+            $payload .= 'Origin: '.json_encode($origin->all()).PHP_EOL;
+        }
+
+        $payload .= 'Schema: '.json_encode($schema, JSON_PRETTY_PRINT).PHP_EOL.
+            'Sql: '.$record->sql.PHP_EOL;
+
+        $sendRawSql = config('slower.ai_payload.send_raw_sql', false);
+        $sendBindings = config('slower.ai_payload.send_bindings', false);
+
+        if ($sendRawSql || $sendBindings) {
+            $redactor = $this->redactor();
+
+            if ($sendRawSql) {
+                $payload .= 'Raw Sql: '.$redactor->redactRawSql((string) $record->raw_sql).PHP_EOL;
+            }
+
+            if ($sendBindings) {
+                $bindings = is_array($record->bindings) ? $record->bindings : [];
+                $payload .= 'Bindings: '.json_encode($redactor->redactBindings($bindings)).PHP_EOL;
+            }
+        }
+
+        return $payload;
+    }
+
+    private function redactor(): PayloadRedactor
+    {
+        $class = config('slower.ai_payload.redactor');
+
+        if ($class === null) {
+            return new PassthroughRedactor;
+        }
+
+        $redactor = app($class);
+
+        if (! $redactor instanceof PayloadRedactor) {
+            // Fail loudly: a misconfigured redactor must never silently pass secrets.
+            throw new InvalidArgumentException(sprintf(
+                'slower.ai_payload.redactor [%s] must implement %s.', $class, PayloadRedactor::class
+            ));
+        }
+
+        return $redactor;
+    }
+
+    /**
      * Build a safe, non-executing EXPLAIN plan for the captured query.
      *
      * Important: this deliberately only ever uses EXPLAIN (never EXPLAIN
@@ -50,7 +118,7 @@ class RecommendationService
      * suspicious (multi-statement) input are skipped, and any EXPLAIN failure
      * is reported without breaking the analysis flow.
      */
-    private function getExplainPlan($record): ?string
+    protected function getExplainPlan($record): ?string
     {
         $rawSql = $record->raw_sql;
 
@@ -101,7 +169,11 @@ class RecommendationService
 
         $schema = [];
 
-        $tables = $this->getTableNamesFromRawQuery($record->raw_sql);
+        // Extract table names from the PARAMETERIZED sql, never raw_sql: a
+        // literal value that happens to contain a keyword like "from" would
+        // otherwise be mistaken for a table name and leak into the schema
+        // payload (and into the schema-introspection queries) as a secret.
+        $tables = $this->getTableNames($record->sql);
         foreach ($tables as $tableName) {
             $columns = $schemaBuilder->getColumnListing($tableName);
             $schema[$tableName]['indexes'] = $schemaBuilder->getIndexes($tableName);
@@ -114,7 +186,7 @@ class RecommendationService
         return $schema;
     }
 
-    private function getTableNamesFromRawQuery(string $sqlQuery): array
+    private function getTableNames(string $sqlQuery): array
     {
         // Regular expression to match table names
         $pattern = '/(?:FROM|JOIN|INTO|UPDATE)\s+(\S+)(?:\s+(?:AS\s+)?\w+)?(?:\s+ON\s+[^ ]+)?/i';

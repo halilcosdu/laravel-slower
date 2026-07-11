@@ -15,6 +15,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $sql
  * @property float $time
  * @property string $connection
+ * @property string|null $fingerprint
+ * @property int|null $fingerprint_version
+ * @property array|null $origin
  * @property Carbon $created_at
  * @property Carbon $updated_at
  */
@@ -31,6 +34,9 @@ class SlowLog extends Model
         'time',
         'connection',
         'recommendation',
+        'fingerprint',
+        'fingerprint_version',
+        'origin',
     ];
 
     public function casts(): array
@@ -39,6 +45,8 @@ class SlowLog extends Model
             'is_analyzed' => 'boolean',
             'bindings' => 'array',
             'time' => 'float',
+            'fingerprint_version' => 'integer',
+            'origin' => 'array',
         ];
     }
 }

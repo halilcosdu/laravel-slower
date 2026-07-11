@@ -385,6 +385,75 @@
 
         .ai-note { color: var(--muted); font-size: 0.76rem; font-family: var(--font-mono); }
 
+        /* ---- Events / Grouped mode ------------------------------------------ */
+        .list-controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .list-controls .filters { flex: 1; margin-bottom: 0; }
+        .view-toggle {
+            display: inline-flex;
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            overflow: hidden;
+            background: var(--surface);
+            flex-shrink: 0;
+        }
+        .view-toggle-item {
+            padding: 8px 14px;
+            font-size: 0.86rem;
+            color: var(--muted);
+            text-decoration: none;
+            border-right: 1px solid var(--border);
+        }
+        .view-toggle-item:last-child { border-right: none; }
+        .view-toggle-item.is-active {
+            color: var(--text);
+            background: var(--surface-2);
+            font-weight: 600;
+        }
+        .notice {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            justify-content: space-between;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+            border: 1px dashed var(--border);
+            border-radius: 10px;
+            color: var(--muted);
+            font-size: 0.86rem;
+        }
+        .badge-count {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-family: var(--font-mono);
+        }
+        .badge-origin { background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+        /* The status dot marks analyzed/pending; count and origin badges don't need it. */
+        .badge-count::before, .badge-origin::before { content: none; }
+        .meta-link { text-decoration: none; }
+        .meta-link:hover { text-decoration: underline; }
+
+        /* ---- Origin panel ---------------------------------------------------- */
+        .origin-list { margin: 0; display: grid; gap: 8px; }
+        .origin-row { display: grid; grid-template-columns: 90px 1fr; gap: 12px; align-items: baseline; }
+        .origin-row dt { color: var(--muted); font-size: 0.8rem; }
+        .origin-row dd { margin: 0; word-break: break-word; }
+        .origin-row code {
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            padding: 1px 6px;
+        }
+
         /* ---- Responsive ----------------------------------------------------- */
         @media (max-width: 760px) {
             .stats-strip { grid-template-columns: repeat(2, 1fr); }
