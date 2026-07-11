@@ -35,8 +35,23 @@ class SlowerServiceProvider extends PackageServiceProvider
 
     public function packageBooted(): void
     {
+        $this->bridgeLegacyOpenAiCredentials();
         $this->registerDashboardGate();
         $this->registerDashboardRoutes();
+    }
+
+    /**
+     * Backward-compat for pre-3.1 installs: a previously published config still
+     * carries a `slower.open_ai.api_key`. Hand it to Prism when Prism's own
+     * OpenAI key is unset, so upgrades keep working without editing prism.php.
+     */
+    private function bridgeLegacyOpenAiCredentials(): void
+    {
+        $legacyKey = config('slower.open_ai.api_key');
+
+        if (filled($legacyKey) && blank(config('prism.providers.openai.api_key'))) {
+            config(['prism.providers.openai.api_key' => $legacyKey]);
+        }
     }
 
     private function registerDashboardGate(): void
@@ -63,6 +78,11 @@ class SlowerServiceProvider extends PackageServiceProvider
     public function packageRegistered(): void
     {
         $this->registerDatabaseListener();
+
+        // Shared so that AiServiceManager::extend() registrations (custom LLMs)
+        // survive: the driver binding below resolves the same manager instance.
+        $this->app->singleton(AiServiceManager::class);
+
         $this->app->singleton(
             AiServiceDriver::class,
             fn () => app(AiServiceManager::class)->driver(config('slower.ai_service', 'openai'))

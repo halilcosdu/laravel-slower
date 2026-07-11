@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Laravel Slower is a Laravel package that automatically detects slow database queries and uses AI (OpenAI) to suggest optimization strategies like indexing and query modifications. Requires PHP 8.3+ and Laravel 11/12/13.
+Laravel Slower is a Laravel package that automatically detects slow database queries and uses AI (OpenAI, Anthropic, Gemini, or a custom LLM via Prism) to suggest optimization strategies like indexing and query modifications. Requires PHP 8.3+ and Laravel 11/12/13.
 
 ## Common Commands
 
@@ -31,19 +31,19 @@ vendor/bin/pest --filter="analyzes a model"       # Run specific test
 
 ### AI Driver System
 
-Uses Laravel's Manager pattern (`Illuminate\Support\Manager`) for AI service abstraction:
-- `AiServiceManager` - Factory; default driver set by `config('slower.ai_service')` (default: `openai`)
+Uses Laravel's Manager pattern (`Illuminate\Support\Manager`) for AI service abstraction, backed by [Prism](https://prismphp.com):
+- `AiServiceManager` - Factory; default driver set by `config('slower.ai_service')` (default: `openai`). Maps any Prism provider name (openai, anthropic, gemini, ollama, …) to a `PrismDriver`; `extend()` registers a fully custom driver.
 - `AiServiceDriver` interface - Single method: `analyze(string $userMessage): ?string`
-- `OpenAiDriver` - Default implementation using `openai-php/laravel`
+- `PrismDriver` - The only Prism-aware class; wraps `Prism::text()`. Provider credentials live in Prism's `config/prism.php` (env `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY`).
 
-To add a new AI provider: implement `AiServiceDriver`, add a `create{Name}Driver()` method in `AiServiceManager`, and set `SLOWER_AI_SERVICE={name}`.
+To add a custom provider: `AiServiceManager::extend('name', fn () => new YourDriver)` and set `SLOWER_AI_SERVICE=name`.
 
 ### Key Configuration (config/slower.php)
 
 - `enabled` / `ai_recommendation` - Toggle package and AI analysis independently
 - `threshold` - Query time in ms to trigger logging (default: 10000)
-- `ai_service` - Driver name (default: `openai`)
-- `recommendation_model` - AI model (default: `gpt-4`)
+- `ai_service` - Provider name (default: `openai`; also anthropic, gemini, ollama, or a custom driver)
+- `recommendation_model` - AI model (default: `null` → a low-cost per-provider default)
 - `recommendation_use_explain` - Include EXPLAIN ANALYSE output in prompts
 - `ignore_explain_queries` / `ignore_insert_queries` - Skip these query types from logging
 

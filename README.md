@@ -122,34 +122,64 @@ return [
         'analyze_pending_limit' => 10,
     ],
     'ai_recommendation' => env('SLOWER_AI_RECOMMENDATION', true),
-    'recommendation_model' => env('SLOWER_AI_RECOMMENDATION_MODEL', 'gpt-5.4-mini'),
+    // null → a sensible low-cost default for the selected provider
+    'recommendation_model' => env('SLOWER_AI_RECOMMENDATION_MODEL'),
     'recommendation_use_explain' => env('SLOWER_AI_RECOMMENDATION_USE_EXPLAIN', true),
     'ignore_explain_queries' => env('SLOWER_IGNORE_EXPLAIN_QUERIES', true),
     'ignore_insert_queries' => env('SLOWER_IGNORE_INSERT_QUERIES', true),
-    'open_ai' => [
-        'api_key' => env('OPENAI_API_KEY'),
-        'organization' => env('OPENAI_ORGANIZATION'),
-        'request_timeout' => env('OPENAI_TIMEOUT'),
-    ],
     'prompt' => env('SLOWER_PROMPT', '...'), // the system prompt sent to the AI
 ];
 ```
 
 Disable AI recommendations by setting `ai_recommendation` to `false` — the package will keep logging slow queries but never call an AI API.
 
-### AI service drivers
+### AI providers
 
-The `ai_service` key selects the AI provider. The default OpenAI driver uses [openai-php/laravel](https://github.com/openai-php/laravel) and reads its credentials from the `open_ai` block. To plug in another provider, implement `HalilCosdu\Slower\AiServiceDrivers\Contracts\AiServiceDriver`, add a `create{Name}Driver()` method on `AiServiceManager` (or `extend()` it from a service provider), and set `SLOWER_AI_SERVICE={name}`.
-
-### Recommendation model
-
-The default `recommendation_model` is `gpt-5.4-mini` (a currently-supported, low-cost model). Pin any model you like:
+Slower talks to every major LLM through [Prism](https://prismphp.com) — one official package, all providers, and **no provider credentials in Slower's own config**. Pick a provider with a single variable:
 
 ```dotenv
-SLOWER_AI_RECOMMENDATION_MODEL=gpt-4
+SLOWER_AI_SERVICE=openai      # or: anthropic, gemini, ollama, ...
 ```
 
-> **Note:** `gpt-4` is scheduled to be shut down on 2026-10-23 — see the [OpenAI deprecations](https://platform.openai.com/docs/deprecations) page.
+Provider keys live in Prism's config (`config/prism.php`), read from the conventional env vars — set the one for your provider:
+
+```dotenv
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=...
+```
+
+| `ai_service` | Default model (override with `SLOWER_AI_RECOMMENDATION_MODEL`) |
+|---|---|
+| `openai` (default) | `gpt-5.4-mini` |
+| `anthropic` | `claude-haiku-4-5` |
+| `gemini` | `gemini-2.5-flash` |
+
+> Model ids move fast — set `SLOWER_AI_RECOMMENDATION_MODEL` to the current low-cost model for your provider if the default drifts.
+
+**Custom / self-hosted LLMs.** Anything with an OpenAI-compatible endpoint (Ollama, Azure OpenAI, LM Studio, OpenRouter, …) works by pointing Prism's provider at it in `config/prism.php` and setting `SLOWER_AI_SERVICE` to that provider (e.g. `ollama`). Providers other than the three above have no built-in default, so also set your model:
+
+```dotenv
+SLOWER_AI_SERVICE=ollama
+SLOWER_AI_RECOMMENDATION_MODEL=qwen2.5-coder
+```
+
+For a fully bespoke backend, register a driver in a service provider — no HTTP code required from Slower:
+
+```php
+use HalilCosdu\Slower\AiServiceDrivers\AiServiceManager;
+use HalilCosdu\Slower\AiServiceDrivers\Contracts\AiServiceDriver;
+
+app(AiServiceManager::class)->extend('my-llm', fn () => new class implements AiServiceDriver
+{
+    public function analyze(string $userMessage): ?string
+    {
+        // call your model, return the recommendation text (or null)
+    }
+});
+```
+
+Then set `SLOWER_AI_SERVICE=my-llm`.
 
 ## Commands & scheduling
 

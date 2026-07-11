@@ -5,6 +5,7 @@ namespace HalilCosdu\Slower\Tests;
 use HalilCosdu\Slower\SlowerServiceProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Orchestra\Testbench\TestCase as Orchestra;
+use Prism\Prism\PrismServiceProvider;
 
 class TestCase extends Orchestra
 {
@@ -20,6 +21,7 @@ class TestCase extends Orchestra
     protected function getPackageProviders($app)
     {
         return [
+            PrismServiceProvider::class,
             SlowerServiceProvider::class,
         ];
     }
@@ -32,9 +34,9 @@ class TestCase extends Orchestra
         config()->set('app.key', 'base64:'.base64_encode(str_repeat('k', 32)));
         // Locks and rate limiting need a lock-capable store without external setup.
         config()->set('cache.default', 'array');
-        // A fake key so the OpenAI driver can be resolved during tests without
-        // making any real HTTP calls.
-        config()->set('slower.open_ai.api_key', 'test-key');
+        // A dummy provider key so Prism drivers can be constructed during tests;
+        // real API calls are always faked (Prism::fake) or the driver is mocked.
+        config()->set('prism.providers.openai.api_key', 'test-key');
 
         // Ensure the slow log table exists for behavior tests that touch the DB.
         $migration = include __DIR__.'/../database/migrations/create_slower_table.php.stub';
