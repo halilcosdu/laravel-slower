@@ -78,6 +78,11 @@ class SlowerServiceProvider extends PackageServiceProvider
     public function packageRegistered(): void
     {
         $this->registerDatabaseListener();
+
+        // Shared so that AiServiceManager::extend() registrations (custom LLMs)
+        // survive: the driver binding below resolves the same manager instance.
+        $this->app->singleton(AiServiceManager::class);
+
         $this->app->singleton(
             AiServiceDriver::class,
             fn () => app(AiServiceManager::class)->driver(config('slower.ai_service', 'openai'))

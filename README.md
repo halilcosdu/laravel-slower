@@ -157,7 +157,14 @@ GEMINI_API_KEY=...
 
 > Model ids move fast — set `SLOWER_AI_RECOMMENDATION_MODEL` to the current low-cost model for your provider if the default drifts.
 
-**Custom / self-hosted LLMs.** Anything with an OpenAI-compatible endpoint (Ollama, Azure OpenAI, LM Studio, OpenRouter, …) works by pointing Prism's provider at it in `config/prism.php` and setting `SLOWER_AI_SERVICE` to that provider (e.g. `ollama`). For a fully bespoke backend, register a driver in a service provider — no HTTP code required from Slower:
+**Custom / self-hosted LLMs.** Anything with an OpenAI-compatible endpoint (Ollama, Azure OpenAI, LM Studio, OpenRouter, …) works by pointing Prism's provider at it in `config/prism.php` and setting `SLOWER_AI_SERVICE` to that provider (e.g. `ollama`). Providers other than the three above have no built-in default, so also set your model:
+
+```dotenv
+SLOWER_AI_SERVICE=ollama
+SLOWER_AI_RECOMMENDATION_MODEL=qwen2.5-coder
+```
+
+For a fully bespoke backend, register a driver in a service provider — no HTTP code required from Slower:
 
 ```php
 use HalilCosdu\Slower\AiServiceDrivers\AiServiceManager;

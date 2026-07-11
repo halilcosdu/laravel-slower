@@ -3,6 +3,7 @@
 namespace HalilCosdu\Slower\AiServiceDrivers;
 
 use Illuminate\Support\Manager;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Prism\Prism\Enums\Provider;
 
@@ -14,14 +15,21 @@ class AiServiceManager extends Manager
     }
 
     /**
-     * Resolve any Prism provider by name (openai, anthropic, gemini, ollama, …).
-     * A driver registered with extend() always wins, so custom LLMs need no
-     * changes here.
+     * Resolve a driver by name. Precedence:
+     *   1. a driver registered with extend() (custom LLMs),
+     *   2. a create{Name}Driver() method (the classic Manager convention),
+     *   3. any Prism provider (openai, anthropic, gemini, ollama, …).
      */
     protected function createDriver($driver)
     {
         if (isset($this->customCreators[$driver])) {
             return $this->callCustomCreator($driver);
+        }
+
+        $method = 'create'.Str::studly($driver).'Driver';
+
+        if ($method !== 'createDriver' && method_exists($this, $method)) {
+            return $this->$method();
         }
 
         $provider = Provider::tryFrom((string) $driver);
@@ -42,8 +50,9 @@ class AiServiceManager extends Manager
     }
 
     /**
-     * An explicit slower.recommendation_model wins for every provider; otherwise
-     * fall back to a sensible, low-cost default per provider.
+     * An explicit slower.recommendation_model wins for every provider. Otherwise
+     * fall back to a low-cost default for the three first-class providers; any
+     * other provider (ollama, groq, a self-hosted model, …) must name its model.
      */
     protected function resolveModel(string $provider): string
     {
@@ -54,9 +63,13 @@ class AiServiceManager extends Manager
         }
 
         return match ($provider) {
+            'openai' => 'gpt-5.4-mini',
             'anthropic' => 'claude-haiku-4-5',
             'gemini' => 'gemini-2.5-flash',
-            default => 'gpt-5.4-mini',
+            default => throw new InvalidArgumentException(
+                "No default model for AI provider [{$provider}]. Set "
+                .'slower.recommendation_model (SLOWER_AI_RECOMMENDATION_MODEL).'
+            ),
         };
     }
 }
