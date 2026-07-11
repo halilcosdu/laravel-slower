@@ -86,7 +86,6 @@ class SlowerServiceProvider extends PackageServiceProvider
                 }
 
                 $this->createRecord($event, $event->connection);
-                $this->notify($event, $event->connection);
             });
         }
     }
@@ -102,11 +101,11 @@ class SlowerServiceProvider extends PackageServiceProvider
         $bindings = $this->normalizeBindings($event->bindings);
 
         try {
-            (new $model)::query()->create([
+            $model::query()->create([
                 'bindings' => $bindings,
                 'sql' => $event->sql,
                 'time' => $event->time,
-                'connection' => get_class($event->connection),
+                'connection' => $event->connection::class,
                 'connection_name' => $event->connectionName,
                 'raw_sql' => $connection->getQueryGrammar()->substituteBindingsIntoRawSql($event->sql, $bindings),
             ]);
@@ -136,10 +135,5 @@ class SlowerServiceProvider extends PackageServiceProvider
         }
 
         return [$bindings];
-    }
-
-    private function notify(QueryExecuted $event, Connection $connection)
-    {
-        //
     }
 }

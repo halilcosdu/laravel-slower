@@ -2,6 +2,22 @@
 
 All notable changes to `laravel-slower` will be documented in this file.
 
+## v3.0.0 - 2026-07-11
+
+Platform modernization. No public API, config, or database changes — only the supported runtime and the development toolchain moved forward.
+
+### Changed
+- **Requires PHP 8.3+ and Laravel 11, 12, or 13.** Laravel 10 and PHP 8.2 support are dropped. The package already relied on the Laravel 11+ `casts()` model method, so Laravel 10 was effectively unsupported; this makes the constraint honest.
+- **`openai-php/laravel` raised to `^0.20.0`** — the previous `^0.18.0` capped at Laravel 12 and silently blocked Laravel 13 installs.
+- **Modernized the dev/test toolchain** to a single stack: Pest 4, `pest-plugin-laravel` 4 (first line to support Laravel 13), PHPStan 2 / larastan 3 (resolving the PHPStan 1-vs-2 dependency conflict), testbench 9–11.
+- **CI** now covers PHP 8.3–8.5 × Laravel 11–13.
+
+### Removed
+- Dead code: the empty `notify()` hook in `SlowerServiceProvider` and its call site.
+
+### Upgrade
+No application-code, config, or migration changes are required if you already run PHP 8.3+ and Laravel 11+. Still on PHP 8.2 or Laravel 10? Stay on the `^2.3` line.
+
 ## v2.3.0 - 2026-07-11
 
 ### Added
