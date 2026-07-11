@@ -202,7 +202,7 @@ The AI payload is **safe by default** — this is the exact contract:
 |---|---|---|
 | Parameterized SQL (`... where id = ?`) | ✅ yes | query shape, no values |
 | Schema & indexes of referenced tables | ✅ yes | column names/types, index definitions |
-| Origin context | ✅ yes (when captured) | route/job/command, code location |
+| Origin context | ✅ yes (when captured) | route/job/command, code location — a captured user id is **never** forwarded |
 | `EXPLAIN` output | ✅ yes (configurable) | the plan — *may echo literal values on some drivers* |
 | Raw SQL with real values | ❌ opt-in | literals: emails, tokens, ids |
 | Bindings | ❌ opt-in | the actual parameter values |

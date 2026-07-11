@@ -54,8 +54,12 @@ class RecommendationService
             'Connection: '.$record->connection.PHP_EOL.
             'Connection Name: '.$record->connection_name.PHP_EOL;
 
-        if (filled($record->origin ?? null)) {
-            $payload .= 'Origin: '.json_encode($record->origin).PHP_EOL;
+        // user_id is captured for the dashboard (and only as an opt-in); the
+        // LLM gains nothing from it, so it never enters the payload.
+        $origin = collect($record->origin ?? [])->except('user_id');
+
+        if ($origin->isNotEmpty()) {
+            $payload .= 'Origin: '.json_encode($origin->all()).PHP_EOL;
         }
 
         $payload .= 'Schema: '.json_encode($schema, JSON_PRETTY_PRINT).PHP_EOL.

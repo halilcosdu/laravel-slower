@@ -206,7 +206,16 @@ class SlowerServiceProvider extends PackageServiceProvider
 
             Event::dispatch(new SlowQueryCaptured($record));
 
-            if ($model::query()->where('fingerprint', $fingerprint)->count() === 1) {
+            // First-seen means "no earlier row carries this fingerprint".
+            // Comparing against earlier ids (instead of counting all rows) is
+            // race-safe: when two processes insert the same new shape
+            // concurrently, exactly one of them sees no predecessor.
+            $hasEarlier = $model::query()
+                ->where('fingerprint', $fingerprint)
+                ->where($record->getKeyName(), '<', $record->getKey())
+                ->exists();
+
+            if (! $hasEarlier) {
                 Event::dispatch(new SlowQueryFirstSeen($record));
             }
         } catch (\Throwable $e) {

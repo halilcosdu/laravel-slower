@@ -72,6 +72,19 @@ describe('safe defaults', function () {
             ->toContain('orders.index')
             ->toContain('OrderController@index');
     });
+
+    it('never forwards the captured user id to the AI provider', function () {
+        // user_id is an opt-in for the dashboard; the LLM gains nothing from
+        // it, so it must be stripped from the payload's origin line.
+        $payload = analyzeAndCapturePayload(canaryRecord([
+            'origin' => ['type' => 'http', 'route' => 'orders.index', 'user_id' => 424242],
+        ]));
+
+        expect($payload)
+            ->toContain('orders.index')
+            ->not->toContain('user_id')
+            ->not->toContain('424242');
+    });
 });
 
 describe('opt-in payload extras', function () {

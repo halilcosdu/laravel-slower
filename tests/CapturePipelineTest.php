@@ -71,6 +71,20 @@ describe('capture events', function () {
         expect($seen)->toBeInstanceOf(SlowLog::class)
             ->and($seen->exists)->toBeTrue();
     });
+
+    it('does not treat a shape as first-seen when an earlier row already carries its fingerprint', function () {
+        Event::fake([SlowQueryCaptured::class, SlowQueryFirstSeen::class]);
+
+        // e.g. a row backfilled by slower:fingerprint, or captured by another process.
+        SlowLog::factory()->create([
+            'fingerprint' => (new SqlFingerprinter)->fingerprint('select 1 as probe'),
+        ]);
+
+        DB::select('select 1 as probe');
+
+        Event::assertDispatched(SlowQueryCaptured::class);
+        Event::assertNotDispatched(SlowQueryFirstSeen::class);
+    });
 });
 
 describe('sampling and caps', function () {
