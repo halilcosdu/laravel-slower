@@ -1,0 +1,25 @@
+providers:
+  - Workbench\App\Providers\WorkbenchServiceProvider
+
+migrations:
+  - workbench/database/migrations
+
+workbench:
+  start: /slower
+  install: true
+  welcome: false
+  build:
+    - create-sqlite-db
+    - migrate-refresh
+    - db-seed:
+        '--class': 'Workbench\Database\Seeders\DatabaseSeeder'
+  assets: []
+  sync: []
+
+env:
+  - APP_ENV=local
+  - APP_DEBUG=true
+  - DB_CONNECTION=sqlite
+  - SLOWER_AI_SERVICE=fake
+  - CACHE_STORE=file
+  - SESSION_DRIVER=file

@@ -2,6 +2,7 @@
 
 // config for HalilCosdu/Slower
 
+use HalilCosdu\Slower\Http\Middleware\Authorize;
 use HalilCosdu\Slower\Models\SlowLog;
 
 return [
@@ -11,6 +12,17 @@ return [
     'resources' => [
         'table_name' => (new SlowLog)->getTable(),
         'model' => SlowLog::class,
+    ],
+    'dashboard' => [
+        'enabled' => env('SLOWER_DASHBOARD_ENABLED', true),
+        'path' => env('SLOWER_DASHBOARD_PATH', 'slower'),
+        'domain' => env('SLOWER_DASHBOARD_DOMAIN'),
+        'middleware' => [
+            'web',
+            Authorize::class,
+        ],
+        'per_page' => 25,
+        'analyze_pending_limit' => 10,
     ],
     'ai_recommendation' => env('SLOWER_AI_RECOMMENDATION', true),
     'recommendation_model' => env('SLOWER_AI_RECOMMENDATION_MODEL', 'gpt-5.4-mini'),

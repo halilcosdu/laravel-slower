@@ -2,6 +2,7 @@
 
 namespace HalilCosdu\Slower\Commands;
 
+use HalilCosdu\Slower\Services\SlowLogPruner;
 use Illuminate\Console\Command;
 
 class SlowLogCleaner extends Command
@@ -10,15 +11,9 @@ class SlowLogCleaner extends Command
 
     public $description = 'Delete records older than 15 days.';
 
-    public function handle(): int
+    public function handle(SlowLogPruner $pruner): int
     {
-        $model = config('slower.resources.model');
-
-        (new $model)::query()
-            ->where('created_at', '<', now()->subDays(intval($this->argument('days'))))
-            ->chunkById(1000, function ($logs) {
-                $logs->each->delete();
-            });
+        $pruner->olderThan(intval($this->argument('days')));
 
         $this->comment('All done');
 

@@ -27,6 +27,11 @@ class TestCase extends Orchestra
     public function getEnvironmentSetUp($app)
     {
         config()->set('database.default', 'testing');
+        // The dashboard routes ride the `web` group (sessions + encrypted
+        // cookies), so an app key must be present — as it is in any real app.
+        config()->set('app.key', 'base64:'.base64_encode(str_repeat('k', 32)));
+        // Locks and rate limiting need a lock-capable store without external setup.
+        config()->set('cache.default', 'array');
         // A fake key so the OpenAI driver can be resolved during tests without
         // making any real HTTP calls.
         config()->set('slower.open_ai.api_key', 'test-key');

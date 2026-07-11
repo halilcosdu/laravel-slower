@@ -2,6 +2,23 @@
 
 All notable changes to `laravel-slower` will be documented in this file.
 
+## v2.3.0 - 2026-07-11
+
+### Added
+- **Built-in dashboard.** A self-contained web UI at `/slower` (Telescope/Horizon-style) — no npm build, no CDN, no assets to publish. It lists captured slow queries with overview stats (total, pending, average and max duration), search over the resolved SQL, filters by analyzed status and connection, sortable columns, and pagination. A detail page shows keyword-formatted SQL, bindings, and the AI recommendation rendered from markdown.
+- **Dashboard actions.** Analyze a single query with AI (with a per-record lock and a rate limiter to prevent duplicate/abusive paid calls), analyze up to `dashboard.analyze_pending_limit` pending queries at once, delete a single record, and clean up records older than N days (`0` clears everything). Every AI action warns it may incur provider charges; every destructive action requires confirmation.
+- **Telescope-style authorization.** Access is granted by the `viewSlower` gate, which defaults to the `local` environment only. Define the gate in a service provider to open the dashboard in other environments. The gate is defined in the provider (not in config) so it is `config:cache`-safe.
+- **Dependency-free, themeable frontend.** Inline CSS design tokens and a small amount of vanilla JS provide a dark/light theme (respects `prefers-color-scheme`, persists the manual choice), copy-to-clipboard, confirmation dialogs, and auto-submitting filters — with no runtime dependency added to the package.
+- **`MarkdownRenderer`** — a tiny, escape-first markdown renderer (headings, bold/italic, inline code, fenced code blocks, lists) that HTML-escapes all input before any transform, so AI-generated recommendations render richly without becoming a stored-XSS vector.
+- **Workbench demo app** — a seeded `testbench serve` environment (with a fake AI driver) for local development and browser testing of the dashboard.
+
+### Changed
+- **Config:** a new additive `dashboard` block (`enabled`, `path`, `domain`, `middleware`, `per_page`, `analyze_pending_limit`). Existing keys are unchanged; published configs keep working via defaults.
+- **Resilient schema extraction.** `RecommendationService` now degrades gracefully when a captured query's connection is unavailable — it analyzes without schema context instead of throwing.
+
+### Upgrade
+Purely additive — no migration required, and the dashboard is disabled outside `local` by default. To use the dashboard: upgrade, then visit `/slower` locally (or define a `viewSlower` gate for other environments). Publish the config with `php artisan vendor:publish --tag="slower-config"` to customize the `dashboard` block.
+
 ## v2.2.0 - 2026-07-03
 
 ### Fixed
