@@ -105,7 +105,7 @@ class DashboardController
         } catch (\Throwable $e) {
             report($e);
 
-            return back()->with('slower.error', 'The AI analysis failed. The query stays pending — try again later.');
+            return back()->with('slower.error', 'The AI analysis failed — the query stays pending. Check your AI provider configuration, then try again.');
         }
 
         if (empty($recommendation)) {
@@ -154,6 +154,13 @@ class DashboardController
             }
 
             empty($recommendation) ? $failed++ : $analyzed++;
+        }
+
+        // Nothing succeeded — most likely a provider/credential misconfiguration
+        // rather than a transient hiccup, so point the operator at the config.
+        if ($analyzed === 0 && $failed > 0) {
+            return redirect()->route('slower.index')->with('slower.error',
+                sprintf('Could not analyze any of the %d pending queries. Check your AI provider configuration (SLOWER_AI_SERVICE and the provider API key).', $failed));
         }
 
         $remaining = $model::query()->where('is_analyzed', false)->count();

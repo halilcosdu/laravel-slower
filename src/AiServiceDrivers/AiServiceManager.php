@@ -58,7 +58,7 @@ class AiServiceManager extends Manager
     {
         $configured = config('slower.recommendation_model');
 
-        if (is_string($configured) && $configured !== '' && $configured !== 'auto') {
+        if (is_string($configured) && $configured !== '') {
             return $configured;
         }
 

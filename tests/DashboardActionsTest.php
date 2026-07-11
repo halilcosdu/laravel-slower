@@ -190,6 +190,22 @@ describe('analyze pending', function () {
             ->assertSessionHas('slower.status');
     });
 
+    it('flashes a configuration error when none of the pending queries can be analyzed', function () {
+        $ai = Mockery::mock(AiServiceDriver::class);
+        $ai->shouldReceive('analyze')->andReturn(null); // provider unusable for every record
+        app()->instance(AiServiceDriver::class, $ai);
+
+        SlowLog::factory()->count(2)->create([
+            'raw_sql' => 'select * from '.config('slower.resources.table_name'),
+        ]);
+
+        $this->post(route('slower.analyze-pending'))
+            ->assertRedirect()
+            ->assertSessionHas('slower.error');
+
+        expect(SlowLog::where('is_analyzed', false)->count())->toBe(2);
+    });
+
     it('shares the analysis rate limit with single-record analysis', function () {
         $ai = Mockery::mock(AiServiceDriver::class);
         $ai->shouldReceive('analyze')->times(5)->andReturn('ok');

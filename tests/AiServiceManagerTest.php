@@ -59,8 +59,8 @@ describe('AiServiceManager provider resolution', function () {
             ->toBe('claude-opus-4-8');
     });
 
-    it('treats an empty or "auto" model as "use the provider default"', function () {
-        config(['slower.recommendation_model' => 'auto']);
+    it('treats an empty model as "use the provider default"', function () {
+        config(['slower.recommendation_model' => '']);
 
         expect(driverProp(app(AiServiceManager::class)->driver('gemini'), 'model'))->toBe('gemini-2.5-flash');
     });
