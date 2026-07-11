@@ -2,6 +2,12 @@
 
 All notable changes to `laravel-slower` will be documented in this file.
 
+## v3.1.1 - 2026-07-11
+
+### Documentation
+- **README modernization.** Each major LLM provider now has its own copy-paste configuration block — **OpenAI, Anthropic (Claude), Google Gemini, self-hosted/OpenAI-compatible (Ollama, LM Studio, OpenRouter, Groq), and a fully custom driver** — each showing the two required lines (`SLOWER_AI_SERVICE` + the provider's API key) and every optional override commented out with its real Prism default (URL, organization, project, API version). Added a table of contents, a capture → analyze → recommend flow, a provider/model-default table, richer programmatic-usage examples (facade, counting pending, batch-analyzing the slowest queries), PHP/Laravel/License badges, and GitHub note/tip/warning callouts.
+- Docs only — no code, configuration, or behavior changes.
+
 ## v3.1.0 - 2026-07-11
 
 ### Added

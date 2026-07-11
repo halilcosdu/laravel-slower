@@ -8,6 +8,9 @@
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/halilcosdu/laravel-slower.svg?style=flat-square)](https://packagist.org/packages/halilcosdu/laravel-slower)
 [![Total Downloads](https://img.shields.io/packagist/dt/halilcosdu/laravel-slower.svg?style=flat-square)](https://packagist.org/packages/halilcosdu/laravel-slower)
+[![PHP Version](https://img.shields.io/badge/PHP-8.3%2B-777BB4?style=flat-square&logo=php&logoColor=white)](https://www.php.net/)
+[![Laravel](https://img.shields.io/badge/Laravel-11--13-FF2D20?style=flat-square&logo=laravel)](https://laravel.com/)
+[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE.md)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="art/dashboard-dark.png">
@@ -16,15 +19,39 @@
 
 </div>
 
-Laravel Slower watches every query your application runs, captures the ones that cross your threshold, and uses AI to recommend indexes and query rewrites. Since **v2.3** it ships with a **built-in dashboard** — install the package and you have a full slow-query UI at `/slower`, with zero frontend work: no npm, no CDN, no assets to publish.
+Laravel Slower watches every query your application runs, captures the ones that cross your threshold, and uses AI to recommend indexes and query rewrites. It speaks to every major LLM — **OpenAI, Anthropic (Claude), Google Gemini, or any custom/self-hosted model** — through one official package. And since **v2.3** it ships with a **built-in dashboard**: install the package and you have a full slow-query UI at `/slower`, with zero frontend work — no npm, no CDN, no assets to publish.
+
+## Contents
+
+- [Features](#features)
+- [How it works](#how-it-works)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [The Dashboard](#the-dashboard)
+- [Configuration](#configuration)
+- [AI providers](#ai-providers)
+- [Commands and scheduling](#commands-and-scheduling)
+- [Programmatic usage](#programmatic-usage)
+- [Development and testing](#development-and-testing)
 
 ## Features
 
 - 🚨 **Automatic capture** — a `DB::listen` hook logs every query slower than your threshold, with bindings and resolved SQL.
-- 🤖 **AI recommendations** — sends the query, schema, indexes and a safe `EXPLAIN` plan to your AI provider (OpenAI out of the box, any provider via a driver) and stores actionable optimization advice.
+- 🤖 **AI recommendations** — sends the query, schema, indexes and a safe `EXPLAIN` plan to your LLM of choice (OpenAI, Anthropic, Gemini, or a custom driver) and stores actionable optimization advice.
+- 🧩 **Any major LLM, one variable** — switch providers with `SLOWER_AI_SERVICE`; credentials live in Prism's config, not Slower's. Bring your own model with a one-method driver.
 - 📊 **Built-in dashboard** — stats, search, filters, sorting, query detail with rendered recommendations, one-click *Analyze with AI*, cleanup tools. Dark and light theme, fully self-contained.
 - 🛡️ **Safe by default** — the dashboard is only accessible in the `local` environment until you explicitly open it, AI actions are rate-limited and capped, destructive actions ask first.
 - ⏰ **Scheduler-friendly commands** — `slower:analyze` and `slower:clean` for bulk analysis and retention.
+
+## How it works
+
+```text
+every query → DB::listen (timed) → slower than threshold → slow_logs → AI analysis → recommendation → /slower
+```
+
+1. **Capture.** A `DB::listen` hook times every query. Anything slower than `threshold` (ms) is written to the `slow_logs` table with its SQL, bindings and connection. Faster queries are ignored — nothing is stored.
+2. **Analyze.** `slower:analyze` (or the dashboard's *Analyze with AI* button) sends each unanalyzed query — plus its table schema, indexes and a safe, read-only `EXPLAIN` plan — to your configured LLM (OpenAI, Claude, Gemini or a custom driver).
+3. **Recommend.** The advice (indexes, rewrites, data-type fixes) is stored on the record and rendered as markdown in the dashboard, ready to act on.
 
 ## Requirements
 
@@ -47,6 +74,8 @@ Optionally publish the config file:
 ```bash
 php artisan vendor:publish --tag="slower-config"
 ```
+
+To enable AI recommendations, [pick a provider](#ai-providers) and set its API key.
 
 ## The Dashboard
 
@@ -131,40 +160,91 @@ return [
 ];
 ```
 
-Disable AI recommendations by setting `ai_recommendation` to `false` — the package will keep logging slow queries but never call an AI API.
+A few keys worth tuning:
 
-### AI providers
+- **`threshold`** — the millisecond bar for "slow". Lower it in staging to surface more, raise it in production to keep the table lean.
+- **`ai_recommendation`** — set to `false` to keep logging slow queries while never calling an AI API (no charges).
+- **`recommendation_use_explain`** — attaches a safe, read-only `EXPLAIN` plan to the prompt for sharper advice.
 
-Slower talks to every major LLM through [Prism](https://prismphp.com) — one official package, all providers, and **no provider credentials in Slower's own config**. Pick a provider with a single variable:
+## AI providers
 
-```dotenv
-SLOWER_AI_SERVICE=openai      # or: anthropic, gemini, ollama, ...
-```
-
-Provider keys live in Prism's config (`config/prism.php`), read from the conventional env vars — set the one for your provider:
+Slower talks to every major LLM through one official package — [Prism](https://prismphp.com). There are **no provider credentials in Slower's own config**: you pick a provider with a single variable, and Prism reads the key from its own config (`config/prism.php`), which in turn reads the conventional environment variables.
 
 ```dotenv
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-GEMINI_API_KEY=...
+SLOWER_AI_SERVICE=openai   # openai · anthropic · gemini · ollama · … · or a custom driver
 ```
 
-| `ai_service` | Default model (override with `SLOWER_AI_RECOMMENDATION_MODEL`) |
+| `ai_service` | Default model |
 |---|---|
-| `openai` (default) | `gpt-5.4-mini` |
+| `openai` *(default)* | `gpt-5.4-mini` |
 | `anthropic` | `claude-haiku-4-5` |
 | `gemini` | `gemini-2.5-flash` |
+| any other Prism provider | *you must set the model* |
 
-> Model ids move fast — set `SLOWER_AI_RECOMMENDATION_MODEL` to the current low-cost model for your provider if the default drifts.
+Override any default with `SLOWER_AI_RECOMMENDATION_MODEL`.
 
-**Custom / self-hosted LLMs.** Anything with an OpenAI-compatible endpoint (Ollama, Azure OpenAI, LM Studio, OpenRouter, …) works by pointing Prism's provider at it in `config/prism.php` and setting `SLOWER_AI_SERVICE` to that provider (e.g. `ollama`). Providers other than the three above have no built-in default, so also set your model:
+> [!NOTE]
+> Upgrading from an OpenAI-only version? Nothing to change — Prism reads your existing `OPENAI_API_KEY`, and a boot-time bridge still honors a legacy `slower.open_ai.api_key`.
+
+Below is the exact setup for each major provider. In every case **only two lines are required** — `SLOWER_AI_SERVICE` and the provider's API key; everything else is an optional override, shown commented out with its default value.
+
+### OpenAI
+
+```dotenv
+SLOWER_AI_SERVICE=openai
+OPENAI_API_KEY=sk-...
+
+# Optional overrides (defaults shown)
+# SLOWER_AI_RECOMMENDATION_MODEL=gpt-5.4-mini
+# OPENAI_URL=https://api.openai.com/v1     # point at Azure OpenAI or a proxy
+# OPENAI_ORGANIZATION=
+# OPENAI_PROJECT=
+```
+
+Get a key at [platform.openai.com](https://platform.openai.com/api-keys).
+
+### Anthropic (Claude)
+
+```dotenv
+SLOWER_AI_SERVICE=anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Optional overrides (defaults shown)
+# SLOWER_AI_RECOMMENDATION_MODEL=claude-haiku-4-5
+# ANTHROPIC_API_VERSION=2023-06-01
+# ANTHROPIC_URL=https://api.anthropic.com/v1
+```
+
+Get a key at [console.anthropic.com](https://console.anthropic.com/).
+
+### Google Gemini
+
+```dotenv
+SLOWER_AI_SERVICE=gemini
+GEMINI_API_KEY=...
+
+# Optional overrides (defaults shown)
+# SLOWER_AI_RECOMMENDATION_MODEL=gemini-2.5-flash
+# GEMINI_URL=https://generativelanguage.googleapis.com/v1beta/models
+```
+
+Get a key at [aistudio.google.com](https://aistudio.google.com/apikey).
+
+### Self-hosted & OpenAI-compatible (Ollama, LM Studio, OpenRouter, Groq, …)
+
+Any Prism provider works. These have **no built-in default model**, so you must name one:
 
 ```dotenv
 SLOWER_AI_SERVICE=ollama
 SLOWER_AI_RECOMMENDATION_MODEL=qwen2.5-coder
+
+# Optional overrides (default shown)
+# OLLAMA_URL=http://localhost:11434
 ```
 
-For a fully bespoke backend, register a driver in a service provider — no HTTP code required from Slower:
+### A fully custom driver
+
+For a bespoke backend, register a driver in a service provider — no HTTP code required from Slower:
 
 ```php
 use HalilCosdu\Slower\AiServiceDrivers\AiServiceManager;
@@ -174,19 +254,24 @@ app(AiServiceManager::class)->extend('my-llm', fn () => new class implements AiS
 {
     public function analyze(string $userMessage): ?string
     {
-        // call your model, return the recommendation text (or null)
+        // Call your model. Return the recommendation text, or null to retry later.
     }
 });
 ```
 
 Then set `SLOWER_AI_SERVICE=my-llm`.
 
-## Commands & scheduling
+> [!TIP]
+> Model ids move fast. If a default drifts, pin the current low-cost model for your provider with `SLOWER_AI_RECOMMENDATION_MODEL`. AI requests time out after Prism's default of 30 seconds — raise it with `PRISM_REQUEST_TIMEOUT` (seconds) for very large schemas or slower models.
+
+## Commands and scheduling
 
 ```bash
 php artisan slower:analyze      # analyze every record where is_analyzed=false
 php artisan slower:clean 15     # delete records older than 15 days
 ```
+
+Run them on a schedule so analysis and retention take care of themselves:
 
 ```php
 use HalilCosdu\Slower\Commands\AnalyzeQuery;
@@ -201,13 +286,37 @@ protected function schedule(Schedule $schedule): void
 
 ## Programmatic usage
 
-```php
-$record = \HalilCosdu\Slower\Models\SlowLog::first();
+Everything the dashboard does is available through the `Slower` facade and the `SlowLog` model.
 
-\HalilCosdu\Slower\Facades\Slower::analyze($record); // returns the analyzed model
+```php
+use HalilCosdu\Slower\Facades\Slower;
+use HalilCosdu\Slower\Models\SlowLog;
+
+// Analyze a single captured query — returns the analyzed model.
+$record = SlowLog::first();
+
+Slower::analyze($record);
 
 $record->raw_sql;        // select count(*) as aggregate from "product_prices" where ...
 $record->recommendation; // the AI's optimization advice (markdown)
+```
+
+Because slow queries are plain Eloquent records, you can query and act on them however you like:
+
+```php
+use HalilCosdu\Slower\Facades\Slower;
+use HalilCosdu\Slower\Models\SlowLog;
+
+// How many queries are still waiting for analysis?
+$pending = SlowLog::where('is_analyzed', false)->count();
+
+// Analyze the twenty slowest unanalyzed queries.
+SlowLog::query()
+    ->where('is_analyzed', false)
+    ->orderByDesc('time')
+    ->limit(20)
+    ->get()
+    ->each(fn (SlowLog $log) => Slower::analyze($log));
 ```
 
 <details>
@@ -232,7 +341,7 @@ WHERE product_id = 1 AND price = 0 AND discount_total > 0;
 
 </details>
 
-## Development & testing
+## Development and testing
 
 ```bash
 composer test       # Pest test suite
