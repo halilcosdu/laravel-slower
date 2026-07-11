@@ -83,8 +83,6 @@ class LocklessTestStore implements Store
 
 beforeEach(function () {
     Gate::define('viewSlower', fn ($user = null) => true);
-    // Simulate a slow-query-only install: package enabled, but no AI provider
-    // configured. Resolving the OpenAI driver would throw here.
     // No provider key configured — the AI layer must never be touched by the
     // read-only/maintenance dashboard actions.
     config(['prism.providers.openai.api_key' => null]);
