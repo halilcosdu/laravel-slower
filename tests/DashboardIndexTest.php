@@ -128,6 +128,31 @@ describe('dashboard index', function () {
             ->assertSeeText('ZZZTAIL');
     });
 
+    it('ignores an array-valued search param instead of crashing', function () {
+        SlowLog::factory()->create(['raw_sql' => 'select * from array_search_probe']);
+
+        $this->get(route('slower.index').'?search[]=x')
+            ->assertOk()
+            ->assertViewHas('records', fn ($records) => $records->total() === 1);
+    });
+
+    it('ignores an array-valued connection param instead of mis-filtering', function () {
+        SlowLog::factory()->create(['connection_name' => 'mysql']);
+        SlowLog::factory()->create(['connection_name' => 'pgsql']);
+
+        $this->get(route('slower.index').'?connection[]=mysql&connection[]=pgsql')
+            ->assertOk()
+            ->assertViewHas('records', fn ($records) => $records->total() === 2);
+    });
+
+    it('renders an out-of-range page without a misleading 0-0 summary', function () {
+        SlowLog::factory()->count(30)->create();
+
+        $response = $this->get(route('slower.index', ['page' => 9999]));
+
+        $response->assertOk()->assertDontSee('0–0');
+    });
+
     it('escapes captured sql in the list', function () {
         SlowLog::factory()->create(['raw_sql' => 'select "<script>alert(1)</script>" from users']);
 

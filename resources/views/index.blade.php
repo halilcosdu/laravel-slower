@@ -3,21 +3,25 @@
 @section('title', 'Slow queries')
 
 @php
-    $currentSort = request('sort');
-    $currentDirection = request('direction', 'desc');
-    $sortLink = function (string $column) use ($currentSort, $currentDirection) {
+    $currentSort = $filters['sort'];
+    $currentDirection = $filters['direction'];
+    $baseQuery = array_filter([
+        'search' => $filters['search'],
+        'status' => $filters['status'],
+        'connection' => $filters['connection'],
+    ], fn ($value) => $value !== '');
+    $sortLink = function (string $column) use ($currentSort, $currentDirection, $baseQuery) {
         $direction = $currentSort === $column && $currentDirection === 'desc' ? 'asc' : 'desc';
 
-        return route('slower.index', array_merge(request()->query(), [
+        return route('slower.index', array_merge($baseQuery, [
             'sort' => $column,
             'direction' => $direction,
-            'page' => null,
         ]));
     };
     $sortArrow = fn (string $column) => $currentSort === $column
         ? ($currentDirection === 'asc' ? '▲' : '▼')
         : '';
-    $filtered = request()->hasAny(['search', 'status', 'connection']);
+    $filtered = $baseQuery !== [];
 @endphp
 
 @section('content')
@@ -55,16 +59,16 @@
     </section>
 
     <form class="filters" method="GET" action="{{ route('slower.index') }}" data-autosubmit>
-        <input type="search" name="search" value="{{ request('search') }}" placeholder="Search captured SQL…" aria-label="Search captured SQL">
+        <input type="search" name="search" value="{{ $filters['search'] }}" placeholder="Search captured SQL…" aria-label="Search captured SQL">
         <select name="status" aria-label="Filter by status">
             <option value="">All statuses</option>
-            <option value="pending" @selected(request('status') === 'pending')>Pending</option>
-            <option value="analyzed" @selected(request('status') === 'analyzed')>Analyzed</option>
+            <option value="pending" @selected($filters['status'] === 'pending')>Pending</option>
+            <option value="analyzed" @selected($filters['status'] === 'analyzed')>Analyzed</option>
         </select>
         <select name="connection" aria-label="Filter by connection">
             <option value="">All connections</option>
             @foreach ($connections as $connection)
-                <option value="{{ $connection }}" @selected(request('connection') === $connection)>{{ $connection }}</option>
+                <option value="{{ $connection }}" @selected($filters['connection'] === $connection)>{{ $connection }}</option>
             @endforeach
         </select>
         @if ($currentSort)

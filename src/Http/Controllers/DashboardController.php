@@ -16,18 +16,30 @@ class DashboardController
 {
     private const ANALYZE_ATTEMPTS_PER_MINUTE = 5;
 
-    public function __construct(protected RecommendationService $recommendationService) {}
+    // The AI service is resolved lazily inside the analyze actions only, so a
+    // slow-query-only install (no AI provider configured) can still browse and
+    // prune the dashboard without the OpenAI driver being resolved.
 
     public function index(Request $request): View
     {
         $model = config('slower.resources.model');
 
+        // Every filter is sanitized to a scalar here (array-valued query params
+        // are coerced away) so both the query and the view stay crash-safe.
+        $filters = [
+            'search' => $this->stringParam($request, 'search'),
+            'status' => in_array($request->query('status'), ['pending', 'analyzed'], true) ? $request->query('status') : '',
+            'connection' => $this->stringParam($request, 'connection'),
+            'sort' => in_array($request->query('sort'), ['time', 'date'], true) ? $request->query('sort') : '',
+            'direction' => $request->query('direction') === 'asc' ? 'asc' : 'desc',
+        ];
+
         $records = $model::query()
-            ->when(trim((string) $request->query('search')) !== '', fn (Builder $query) => $this->applySearch($query, (string) $request->query('search')))
-            ->when($request->query('status') === 'pending', fn (Builder $query) => $query->where('is_analyzed', false))
-            ->when($request->query('status') === 'analyzed', fn (Builder $query) => $query->where('is_analyzed', true))
-            ->when($request->filled('connection'), fn (Builder $query) => $query->where('connection_name', $request->query('connection')))
-            ->tap(fn (Builder $query) => $this->applySort($query, $request))
+            ->when($filters['search'] !== '', fn (Builder $query) => $this->applySearch($query, $filters['search']))
+            ->when($filters['status'] === 'pending', fn (Builder $query) => $query->where('is_analyzed', false))
+            ->when($filters['status'] === 'analyzed', fn (Builder $query) => $query->where('is_analyzed', true))
+            ->when($filters['connection'] !== '', fn (Builder $query) => $query->where('connection_name', $filters['connection']))
+            ->tap(fn (Builder $query) => $this->applySort($query, $filters))
             ->paginate(max(1, (int) config('slower.dashboard.per_page', 25)))
             ->withQueryString();
 
@@ -54,6 +66,7 @@ class DashboardController
             'records' => $records,
             'stats' => $stats,
             'connections' => $connections,
+            'filters' => $filters,
         ]);
     }
 
@@ -74,20 +87,25 @@ class DashboardController
             return $limited;
         }
 
-        $lock = Cache::lock('slower:analyze:'.$record->getKey(), 60);
-
-        if (! $lock->get()) {
-            return back()->with('slower.error', 'This query is already being analyzed.');
-        }
-
+        // Lock acquisition and driver resolution are inside the try/catch so a
+        // cache store without lock support or a missing AI provider surfaces as
+        // a flash message instead of a 500.
         try {
-            $recommendation = $this->recommendationService->getRecommendation($record);
+            $lock = Cache::lock('slower:analyze:'.$record->getKey(), 60);
+
+            if (! $lock->get()) {
+                return back()->with('slower.error', 'This query is already being analyzed.');
+            }
+
+            try {
+                $recommendation = app(RecommendationService::class)->getRecommendation($record);
+            } finally {
+                $lock->release();
+            }
         } catch (\Throwable $e) {
             report($e);
 
             return back()->with('slower.error', 'The AI analysis failed. The query stays pending — try again later.');
-        } finally {
-            $lock->release();
         }
 
         if (empty($recommendation)) {
@@ -113,13 +131,21 @@ class DashboardController
             return redirect()->route('slower.index')->with('slower.status', 'Nothing to analyze — there are no pending queries.');
         }
 
+        try {
+            $service = app(RecommendationService::class);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->with('slower.error', 'The AI service is not available. Check your configuration and try again.');
+        }
+
         $limit = max(1, (int) config('slower.dashboard.analyze_pending_limit', 10));
         $analyzed = 0;
         $failed = 0;
 
         foreach ($model::query()->where('is_analyzed', false)->orderBy('id')->limit($limit)->get() as $record) {
             try {
-                $recommendation = $this->recommendationService->getRecommendation($record);
+                $recommendation = $service->getRecommendation($record);
             } catch (\Throwable $e) {
                 report($e);
                 $failed++;
@@ -174,6 +200,13 @@ class DashboardController
         return $model::query()->findOrFail($id);
     }
 
+    private function stringParam(Request $request, string $key): string
+    {
+        $value = $request->query($key);
+
+        return is_string($value) ? trim($value) : '';
+    }
+
     private function rateLimitAnalysis(Request $request): ?RedirectResponse
     {
         $key = 'slower-analyze:'.($request->user()?->getAuthIdentifier() ?? $request->ip());
@@ -198,13 +231,14 @@ class DashboardController
         return $query;
     }
 
-    private function applySort(Builder $query, Request $request): void
+    /**
+     * @param  array{sort: string, direction: string}  $filters
+     */
+    private function applySort(Builder $query, array $filters): void
     {
-        $direction = $request->query('direction') === 'asc' ? 'asc' : 'desc';
-
-        match ($request->query('sort')) {
-            'time' => $query->orderBy('time', $direction)->orderBy('id', 'desc'),
-            'date' => $query->orderBy('id', $direction),
+        match ($filters['sort']) {
+            'time' => $query->orderBy('time', $filters['direction'])->orderBy('id', 'desc'),
+            'date' => $query->orderBy('id', $filters['direction']),
             default => $query->latest('id'),
         };
     }
