@@ -18,7 +18,11 @@ class RecommendationService
 
         if (config('slower.recommendation_use_explain', false)) {
             if ($plan = $this->getExplainPlan($record)) {
-                $userMessage .= 'EXPLAIN output: '.$plan.PHP_EOL;
+                // The plan can echo literal values on some drivers (e.g. pgsql
+                // `Filter: (col = 'secret')`), so it goes through the same
+                // redactor as raw SQL — a configured redactor covers every
+                // outbound path, not just the opt-in raw_sql/bindings.
+                $userMessage .= 'EXPLAIN output: '.$this->redactor()->redactRawSql($plan).PHP_EOL;
             }
         }
 
@@ -114,7 +118,7 @@ class RecommendationService
      * suspicious (multi-statement) input are skipped, and any EXPLAIN failure
      * is reported without breaking the analysis flow.
      */
-    private function getExplainPlan($record): ?string
+    protected function getExplainPlan($record): ?string
     {
         $rawSql = $record->raw_sql;
 

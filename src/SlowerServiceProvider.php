@@ -218,13 +218,18 @@ class SlowerServiceProvider extends PackageServiceProvider
 
         $context->recordCapture();
 
-        // Event delivery is isolated: a throwing application listener (a Slack
-        // notifier during an outage, say) is reported but never bubbles into
-        // the app's query path nor arms the storage circuit breaker — the row
-        // was stored fine.
+        // Each event is delivered independently and defensively: a throwing
+        // application listener (a Slack notifier mid-outage, say) is reported
+        // but must not suppress the *other* event, arm the storage circuit
+        // breaker, or bubble into the app's own query path — the row is stored.
+        $this->dispatchSafely(fn () => Event::dispatch(new SlowQueryCaptured($record)));
+        $this->dispatchSafely(fn () => $this->dispatchFirstSeen($model, $record));
+    }
+
+    private function dispatchSafely(callable $dispatch): void
+    {
         try {
-            Event::dispatch(new SlowQueryCaptured($record));
-            $this->dispatchFirstSeen($model, $record);
+            $dispatch();
         } catch (\Throwable $e) {
             report($e);
         }
@@ -232,18 +237,15 @@ class SlowerServiceProvider extends PackageServiceProvider
 
     /**
      * Fire SlowQueryFirstSeen the first time a (fingerprint, connection) pair
-     * appears — the same identity the grouped dashboard uses. "First" means no
-     * earlier row shares it: comparing against earlier ids (rather than a
-     * count) is race-safe, so exactly one of two concurrent inserts of a brand
-     * new shape sees no predecessor. The lookup is skipped entirely when
-     * nothing listens, keeping capture cheap for the default install.
+     * appears — the same identity the grouped dashboard groups by. "First"
+     * means no earlier row shares it: comparing against earlier ids (rather
+     * than a count) is race-safe, so exactly one of two concurrent inserts of
+     * a brand new shape sees no predecessor. The lookup is a single indexed
+     * `exists()`; captures are rare (slow queries only), so it is not gated on
+     * listener presence — that gate is invisible to a downstream Event::fake().
      */
     private function dispatchFirstSeen(string $model, $record): void
     {
-        if (! Event::hasListeners(SlowQueryFirstSeen::class)) {
-            return;
-        }
-
         $hasEarlier = $model::query()
             ->where('fingerprint', $record->fingerprint)
             ->where('connection_name', $record->connection_name)

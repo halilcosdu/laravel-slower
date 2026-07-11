@@ -35,7 +35,14 @@ class SqlFingerprinter
         //    String literals use standard `''` doubling (correct for
         //    pgsql/sqlite and MySQL in ANSI mode); a trailing backslash is an
         //    ordinary character, so the closing quote always terminates the
-        //    literal instead of over-running into the following SQL.
+        //    literal instead of over-running into the following SQL. The
+        //    deliberate tradeoff: a MySQL-default `\'` mid-string escape is
+        //    read as a terminator, so two shapes that differ only inside such
+        //    an inlined literal may share a group. This is rare — fingerprints
+        //    are built from the parameterized SQL, where values are `?` — and
+        //    a text-only normalizer cannot resolve `\'` without the driver's
+        //    escaping mode. A false split (an extra group) is preferred over a
+        //    false merge, so we favor the standard-conforming reading.
         //    Double-quoted / backtick tokens are identifiers and are left alone.
         $sql = (string) preg_replace_callback(
             "~'(?:[^']|'')*'|--[^\n]*|/\\*.*?\\*/~s",

@@ -101,6 +101,21 @@ describe('capture events', function () {
         Event::assertDispatched(SlowQueryFirstSeen::class);
     });
 
+    it('still fires FirstSeen when a Captured listener throws (events are independent)', function () {
+        Event::listen(SlowQueryCaptured::class, function () {
+            throw new RuntimeException('captured listener down');
+        });
+        $firstSeen = 0;
+        Event::listen(SlowQueryFirstSeen::class, function () use (&$firstSeen) {
+            $firstSeen++;
+        });
+
+        DB::select('select 1 as brand_new_shape');
+
+        expect($firstSeen)->toBe(1)
+            ->and(SlowLog::query()->count())->toBe(1);
+    });
+
     it('keeps the row and still fires events when a synchronous listener throws', function () {
         // A user listener (e.g. a Slack notifier) throwing must NOT be mistaken
         // for a storage failure: the row is already stored, so the circuit

@@ -114,6 +114,41 @@ describe('opt-in payload extras', function () {
         expect(analyzeAndCapturePayload(canaryRecord()))->toContain('canary@example.com');
     });
 
+    it('runs EXPLAIN output through the configured redactor too', function () {
+        // A privacy-conscious user who wires a redactor expects it applied to
+        // everything outbound — including the EXPLAIN plan, which on some
+        // drivers echoes literal values.
+        config([
+            'slower.recommendation_use_explain' => true,
+            'slower.ai_payload.redactor' => MaskEverythingRedactor::class,
+        ]);
+
+        $captured = null;
+        $driver = Mockery::mock(AiServiceDriver::class);
+        $driver->shouldReceive('analyze')->once()
+            ->with(Mockery::on(function (string $m) use (&$captured) {
+                $captured = $m;
+
+                return true;
+            }))->andReturn('ok');
+        app()->instance(AiServiceDriver::class, $driver);
+
+        // A stubbed service whose EXPLAIN plan carries a secret literal.
+        $service = new class(app(AiServiceDriver::class)) extends RecommendationService
+        {
+            protected function getExplainPlan($record): ?string
+            {
+                return "Filter: (api_token = 'sk-CANARY-EXPLAIN')";
+            }
+        };
+
+        $service->getRecommendation(canaryRecord());
+
+        expect($captured)
+            ->toContain('[REDACTED SQL]')
+            ->not->toContain('sk-CANARY-EXPLAIN');
+    });
+
     it('passes opted-in raw sql and bindings through the configured redactor', function () {
         config([
             'slower.ai_payload.send_raw_sql' => true,

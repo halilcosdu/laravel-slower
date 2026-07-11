@@ -245,7 +245,7 @@ class SlowerRedactor implements PayloadRedactor
 }
 ```
 
-A misconfigured redactor (a class that doesn't implement the contract) throws instead of silently passing secrets. In strict environments also set `SLOWER_AI_RECOMMENDATION_USE_EXPLAIN=false`, since an `EXPLAIN` plan can echo literal values from the query.
+A misconfigured redactor (a class that doesn't implement the contract) throws instead of silently passing secrets. The redactor covers **every** outbound path — raw SQL, bindings, and the `EXPLAIN` plan (which can echo literal values on some drivers) — so a configured redactor is applied consistently. Without a redactor, set `SLOWER_AI_RECOMMENDATION_USE_EXPLAIN=false` in strict environments to keep plan literals out of the payload.
 
 ## Queued analysis
 
