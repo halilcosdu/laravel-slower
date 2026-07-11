@@ -33,8 +33,9 @@ class SqlFormatter
 
         $formatted = '';
 
+        // PREG_SPLIT_NO_EMPTY guarantees every segment is a non-empty string.
         foreach ($segments as $segment) {
-            $isQuoted = $segment !== '' && in_array($segment[0], ["'", '"', '`'], true);
+            $isQuoted = in_array($segment[0], ["'", '"', '`'], true);
 
             $formatted .= $isQuoted
                 ? $segment

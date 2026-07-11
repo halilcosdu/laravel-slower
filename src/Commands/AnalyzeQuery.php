@@ -24,7 +24,7 @@ class AnalyzeQuery extends Command
         $analyzed = 0;
         $skipped = 0;
 
-        (new $model)::query()
+        $model::query()
             ->where('is_analyzed', false)
             ->chunkById(1000, function ($records) use ($recommendationService, &$analyzed, &$skipped) {
                 foreach ($records as $record) {

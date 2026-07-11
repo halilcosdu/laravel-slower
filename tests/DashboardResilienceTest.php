@@ -55,6 +55,12 @@ class LocklessTestStore implements Store
         return $this->put($key, $value, 0);
     }
 
+    // Present on the Laravel 13 Store contract; harmless as an extra method on 11/12.
+    public function touch($key, $seconds)
+    {
+        return true;
+    }
+
     public function forget($key)
     {
         unset($this->items[$key]);

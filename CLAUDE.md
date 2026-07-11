@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Laravel Slower is a Laravel package that automatically detects slow database queries and uses AI (OpenAI) to suggest optimization strategies like indexing and query modifications. Requires PHP 8.2+ and Laravel 10/11/12/13.
+Laravel Slower is a Laravel package that automatically detects slow database queries and uses AI (OpenAI) to suggest optimization strategies like indexing and query modifications. Requires PHP 8.3+ and Laravel 11/12/13.
 
 ## Common Commands
 
@@ -60,4 +60,4 @@ Test files: `SlowerTest` (core analysis), `ConfigTest` (config defaults), `Comma
 
 ## CI
 
-Tests run on PHP 8.2-8.3 with Laravel 11-13 (`prefer-lowest` and `prefer-stable`). Laravel 13 requires PHP 8.3+. PHPStan and Pint run as separate workflows.
+Tests run on PHP 8.3-8.5 with Laravel 11-13 (`prefer-lowest` and `prefer-stable`), using the Pest 4 / PHPStan 2 (larastan 3) stack. PHPStan and Pint run as separate workflows.
